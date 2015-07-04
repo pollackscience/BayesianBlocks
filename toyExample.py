@@ -2,7 +2,7 @@
 
 #from bayesianBlocks import *
 import numpy as np
-from astroML.plotting import hist
+from hist_tools_modified import hist
 import matplotlib.pyplot as plt
 import pandas as pd
 import cPickle as pkl
