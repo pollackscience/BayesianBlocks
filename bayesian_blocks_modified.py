@@ -63,8 +63,9 @@ class FitnessFunc(object):
             return self.fitness.__code__.co_varnames[1:]
 
 
-class EventsPoly(FitnessFunc):
-    """Fitness for binned or unbinned events
+class PolyEvents(FitnessFunc):
+    """Fitness for binned or unbinned events that follow a polynomial
+    piecewise distribution
 
     Parameters
     ----------
@@ -77,7 +78,7 @@ class EventsPoly(FitnessFunc):
     """
     def fitness(self, N_k, T_k):
         # eq. 19 from Scargle 2012
-        return N_k * (np.log(N_k) - np.log(T_k))
+        return N_k * (np.log(N_k/(T_k*(1-(N_k-2)/(2*(N_k-1)))))) + np.log(1+(N_k-2)/(N_k-1))
 
     def prior(self, N, Ntot):
         if self.gamma is not None:
@@ -182,7 +183,7 @@ class PointMeasures(FitnessFunc):
 
 
 def bayesian_blocks(t, x=None, sigma=None,
-                    fitness='events', **kwargs):
+                    fitness='poly_events', **kwargs):
     """Bayesian Blocks Implementation
 
     This is a flexible implementation of the Bayesian Blocks algorithm
@@ -272,6 +273,10 @@ def bayesian_blocks(t, x=None, sigma=None,
         if x is not None and np.any(x % 1 > 0):
             raise ValueError("x must be integer counts for fitness='events'")
         fitfunc = Events(**kwargs)
+    elif fitness == 'poly_events':
+        if x is not None and np.any(x % 1 > 0):
+            raise ValueError("x must be integer counts for fitness='events'")
+        fitfunc = PolyEvents(**kwargs)
     elif fitness == 'regular_events':
         if x is not None and (np.any(x % 1 > 0) or np.any(x > 1)):
             raise ValueError("x must be 0 or 1 for fitness='regular_events'")

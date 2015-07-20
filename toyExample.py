@@ -17,10 +17,11 @@ def generateToy():
   np.random.seed(12345)
 
   fig,ax = plt.subplots(2,sharex=True)
+  #fig,ax = plt.subplots(2)
 
   powerlaw_arg = 2
   triang_arg=0.7
-  n_samples = 5000
+  n_samples = 1000
   #generate simple line with slope 1, from 0 to 1
   frozen_powerlaw = powerlaw(powerlaw_arg) #powerlaw.pdf(x, a) = a * x**(a-1)
   #generate triangle with peak at 0.7
