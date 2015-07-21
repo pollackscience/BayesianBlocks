@@ -10,7 +10,11 @@ References
 ----------
 .. [1] http://adsabs.harvard.edu/abs/2012arXiv1207.5578S
 """
+from __future__ import division
 import numpy as np
+from sympy.solvers import solve
+from sympy import Symbol
+from sympy.functions import re
 # TODO: implement other fitness functions from appendix B of Scargle 2012
 
 
@@ -76,9 +80,35 @@ class PolyEvents(FitnessFunc):
         If specified, then use this gamma to compute the general prior form,
         p ~ gamma^N.  If gamma is specified, p0 is ignored.
     """
-    def fitness(self, N_k, T_k):
+    def fitness(self, N_k, T_k, N_i):
         # eq. 19 from Scargle 2012
-        return N_k * (np.log(N_k/(T_k*(1-(N_k-2)/(2*(N_k-1)))))) + np.log(1+(N_k-2)/(N_k-1))
+        #a = (N_k-2)/(T_k*(N_k-1))
+        print 'N_i',N_i
+        print 'N_k',N_k
+        print 'T_k',T_k
+        a = Symbol('a')
+        a_i = []
+        if len(N_i)>1:
+          for i in range(len(N_k)):
+            #a_sol = solve(2/T_k[i] - a)[0]
+            a_sol = solve(2/T_k[i] - a + N_k[i] * np.sum((N_i[i:-2]-N_i[-1])/(1+a*(N_i[i:-2]-N_i[-1])))**-1)[0]
+            print a_sol, type(a_sol)
+            try:
+              a_i.append(re(a_sol))
+            except:
+              a_i.append(a_sol)
+        else:
+          pass
+
+        if len(N_i)>1:
+          a_i = np.asarray(a_i,dtype=float)
+          print 'a_i',a_i
+          lamb = N_k/T_k*(1-a_i*T_k/2.0)
+          #print 'lamb',lamb, np.log(lamb)
+          return N_k * np.log(lamb) + N_k * np.sum(np.log(1+a_i*(N_i-N_i[-1])))
+          #return N_k * np.log(lamb)
+        else:
+          return N_k
 
     def prior(self, N, Ntot):
         if self.gamma is not None:
@@ -101,6 +131,8 @@ class Events(FitnessFunc):
     """
     def fitness(self, N_k, T_k):
         # eq. 19 from Scargle 2012
+        print 'N_k',N_k
+        print 'T_k',T_k
         return N_k * (np.log(N_k) - np.log(T_k))
 
     def prior(self, N, Ntot):
@@ -184,6 +216,7 @@ class PointMeasures(FitnessFunc):
 
 def bayesian_blocks(t, x=None, sigma=None,
                     fitness='poly_events', **kwargs):
+                    #fitness='events', **kwargs):
     """Bayesian Blocks Implementation
 
     This is a flexible implementation of the Bayesian Blocks algorithm
@@ -381,8 +414,14 @@ def bayesian_blocks(t, x=None, sigma=None,
         if 'c_k' in fitfunc.args:
             kwds['c_k'] = 0.5 * np.cumsum(ck_raw[:R + 1][::-1])[::-1]
 
+        # N_i: all block elements
+        if 'N_i' in fitfunc.args:
+            kwds['N_i'] = t[:R + 1]
+
         # evaluate fitness function
         fit_vec = fitfunc.fitness(**kwds)
+        print fit_vec
+        raw_input()
 
         A_R = fit_vec - fitfunc.prior(R + 1, N)
         A_R[1:] += best[:R]

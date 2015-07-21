@@ -16,7 +16,7 @@ def generateToy():
 
   np.random.seed(12345)
 
-  fig,ax = plt.subplots(2,sharex=True)
+  fig,ax = plt.subplots(3,sharex=True)
   #fig,ax = plt.subplots(2)
 
   powerlaw_arg = 2
@@ -29,8 +29,11 @@ def generateToy():
 
   x = np.linspace(0,1)
 
+  signal = np.random.normal(0.5, 0.1, 500)
+
   data_frame = pd.DataFrame({'powerlaw':powerlaw.rvs(powerlaw_arg,size=n_samples),
-    'triangle':triang.rvs(triang_arg,size=n_samples)})
+    'triangle':triang.rvs(triang_arg,size=n_samples),
+    'powerlaw_signal':np.concatenate((powerlaw.rvs(powerlaw_arg,size=500),signal))})
 
   ax[0].plot(x, frozen_powerlaw.pdf(x), 'k-', lw=2, label='powerlaw pdf')
   hist(data_frame['powerlaw'],bins=100,normed=True,histtype='stepfilled',alpha=0.2,label='100 bins',ax=ax[0])
@@ -42,8 +45,14 @@ def generateToy():
   hist(data_frame['triangle'],bins='blocks',normed=True,histtype='stepfilled',alpha=0.2,label='b blocks',ax=ax[1])
   ax[1].legend(loc = 'best')
 
+
+  #ax[0].plot(x, frozen_powerlaw.pdf(x), 'k-', lw=2, label='powerlaw pdf')
+  hist(data_frame['powerlaw_signal'],bins=100,normed=True,histtype='stepfilled',alpha=0.2,label='100 bins',ax=ax[2])
+  hist(data_frame['powerlaw_signal'],bins='blocks',normed=True,histtype='stepfilled',alpha=0.2,label='b blocks',ax=ax[2])
+  ax[2].legend(loc = 'best')
+
   plt.show()
-  plt.savefig('plots/toy_plots.png',bbox_inches='tight')
+  fig.savefig('plots/toy_plots.png')
 
   #x = np.random.normal(size=1000)
 #  z_data_subset = z_data[0:20000]
