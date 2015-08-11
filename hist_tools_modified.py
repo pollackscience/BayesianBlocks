@@ -9,7 +9,7 @@ from astroML.density_estimation import\
 from bayesian_blocks_modified import bayesian_blocks
 
 
-def hist(x, bins=10, range=None, *args, **kwargs):
+def hist(x, bins=10, range=None, fitness='events', gamma = None, p0=0.05, *args, **kwargs):
     """Enhanced histogram
 
     This is a histogram function that enables the use of more sophisticated
@@ -63,7 +63,7 @@ def hist(x, bins=10, range=None, *args, **kwargs):
         x = x[(x >= range[0]) & (x <= range[1])]
 
     if bins in ['blocks']:
-        bins = bayesian_blocks(x)
+        bins = bayesian_blocks(x,fitness=fitness,p0=p0,gamma=gamma)
     elif bins in ['knuth', 'knuths']:
         dx, bins = knuth_bin_width(x, True, disp=False)
     elif bins in ['scott', 'scotts']:
