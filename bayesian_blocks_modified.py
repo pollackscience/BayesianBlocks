@@ -82,94 +82,110 @@ class PolyEvents(FitnessFunc):
         If specified, then use this gamma to compute the general prior form,
         p ~ gamma^N.  If gamma is specified, p0 is ignored.
     """
-    def fitness(self, N_k, T_k, N_i):
+    def fitness(self, N_k, M_k, N_i):
+        verbose = True
         # eq. 19 from Scargle 2012
         #a = (N_k-2)/(T_k*(N_k-1))
-        #print 'N_i',N_i
-        #print 'N_k',N_k
-        #print 'T_k',T_k
-        #a = Symbol('a')
+        if(verbose):
+          print 'fitness call'
+          print 'N_i',N_i
+          print 'N_k',N_k
+          print 'M_k',M_k
+        #raw_input()
+        x = Symbol('x')
         a_i = []
 
-        def f_a(a,T_k,N_k,N_i,i):
-          return 2/T_k[i] - a + N_k[i] * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1
+        def f_a(a,M_k,N_k,N_i,i):
+          return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1
+          #return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i+1:]-N_i[-1])/(1+a*(N_i[i+1:]-N_i[-1])))**-1
 
-        if len(N_i)>1:
-          for i in range(len(N_i)-1):
-            #upper_bound = 2.0/T_k[i]
-            upper_bound= min(1.0/(N_i[-1]-N_i[-2]),2.0/T_k[i])
-            lower_bound = None
+        for i in range(len(N_i)):
+
+        #special cases
+          if N_k[i]==1:
+            a_i.append(np.inf)
+          elif N_k[i]==2:
+            a_i.append(0)
+
+          else:
+
+            #upper_bound = 2.0/M_k[i]
+            upper_bound= min(1.0/(N_i[-1]-N_i[0]),2.0/M_k[i])
+            #upper_bound= max(1.0/(N_i[-1]-N_i[-2]),2.0/M_k[i])*2
+            lower_bound = upper_bound
             #start_val = (lower_bound+upper_bound)/2.0
-            start_val = upper_bound/2.0
+            start_val = upper_bound/10.0
 
-            #print 'upper', upper_bound
-            #print 'lower', lower_bound
-            #print 'start_val', start_val
 
-            #a_sol = optimize.newton(f_a,start_val,args=(T_k,N_k,N_i,i),maxiter=5000)
-            #a_sol = optimize.brentq(f_a,lower_bound,upper_bound,args=(T_k,N_k,N_i,i),maxiter=5000)
+            while(np.sign(f_a(upper_bound,M_k,N_k,N_i,i))==np.sign(f_a(lower_bound,M_k,N_k,N_i,i))):
+              lower_bound-=0.1
+            if verbose:
+              print 'a_i loop'
+              print 'M_k', M_k[i]
+              print 'N_k', N_k[i]
+              print 'N_i', N_i
+              print 'upper', upper_bound, f_a(upper_bound,M_k,N_k,N_i,i)
+              print 'lower', lower_bound, f_a(lower_bound,M_k,N_k,N_i,i)
+              print f_a(x,M_k,N_k,N_i,i)
+
+            #a_sol = optimize.newton(f_a,start_val,args=(M_k,N_k,N_i,i),maxiter=5000)
+            a_sol = optimize.brentq(f_a,lower_bound,upper_bound,args=(M_k,N_k,N_i,i),maxiter=5000)
             #a_sol = start_val
-            #a_sol = optimize.minimize(f_a,[start_val],args=(T_k,N_k,N_i,i),bounds=((lower_bound,upper_bound),),method = 'L-BFGS-B')
-            #a_sol = optimize.minimize(f_a,[start_val],args=(T_k,N_k,N_i,i),bounds=((lower_bound,upper_bound),),method = 'SLSQP')
             #print a_sol
             #a_sol = a_sol.x[0]
 
-            a_sol = optimize.minimize_scalar(f_a,args=(T_k,N_k,N_i,i),bounds=(-upper_bound,upper_bound), method = 'bounded')
-            #print  a_sol
-            a_sol = a_sol.x
 
-            #f2 = lambda a: f_a(a,T_k,N_k,N_i,i)
-            #a_sol = findroot(lambda a: 2/T_k[i] - a + N_k[i] * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1,start_val)
+            #f2 = lambda a: f_a(a,M_k,N_k,N_i,i)
+            #a_sol = findroot(lambda a: 2/M_k[i] - a + N_k[i] * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1,start_val)
             #a_sol = findroot(f2,start_val+1,tol=0.0001,solver = 'newton')
             #a_sol = findroot(f2,start_val, tol = 0.0001,solver='halley')
             #a_sol = findroot(f2,start_val,solver='anderson')
             #start_val = a_sol
             #a_sol = 1
 
-            #print 'a',a_sol
-            #print '2Mk',2*T_k[i]
-            #print 'Nis',N_i
-            #print 'tks',T_k
-            #print 'Mk comp',T_k[i],N_i[-1]-N_i[i]
-            #raw_input()
 
-            #try:
-            #  a_i.append(re(a_sol))
-            #except:
-            #  a_i.append(a_sol)
-            #if a_sol>2.0/T_k[i]:
-            #  a_sol = 1.0/T_k[i]
-            #  print 'a',a_sol
+            if verbose:
+              print 'a_sol', a_sol
+              raw_input()
+
             a_i.append(a_sol)
-          #a_i.append(2.0/T_k[i])
-          #a_i.append(0)
-        else:
-          pass
 
-        if len(N_i)>1:
-          a_i = np.asarray(a_i,dtype=float)
-          #print 'a_i',a_i
-          lamb = N_k/(T_k*(1-a_i*T_k/2.0))
-          #lamb = np.where(lamb<=0,0.0001,lamb)
-          loglamb = np.log(lamb)
-          if np.any(np.isnan(loglamb)):
-            print 'loglamb nan, man:',loglamb
-          #loglamb = np.where(np.isnan(loglamb),-100,loglamb)
-          #print 'lamb',lamb, loglamb
-          #raw_input()
-          logsum = np.sum(np.log(1+(a_i)*(N_i[:-1]-N_i[-1])))
-          if np.any(np.isnan(logsum)):
-            print a_i, N_i[:-1],N_i[-1]
-            print 'logsum nan:',1+(a_i)*(N_i[:-1]-N_i[-1])
-          #return N_k * loglamb + N_k * np.where(np.isnan(logsum),-100,logsum) - N_k
-          #return N_k * loglamb + N_k * logsum
-          return N_k * logsum
-          #return (lamb**N_k+np.prod(1+a_i*(N_i-N_i[-1])))/10.0**100
+        #if len(N_i)>1:
+        a_i = np.asarray(a_i,dtype=float)
+        lamb = (N_k)/((M_k)*(1-a_i*(M_k)/2.0))
+        lamb = np.where(np.isinf(a_i),1,lamb) #if a is inf, lambda is 0
+        if verbose:
+          print 'calculating lambda'
+          print 'a_i',a_i
+          print 'N_k',N_k
+          print 'M_k',M_k
+          print 'lamb', lamb
+        loglamb = np.log(lamb)
+        if np.any(np.isnan(loglamb)):
+          print 'loglamb nan, man:',loglamb
+        #loglamb = np.where(np.isnan(loglamb),-100,loglamb)
+        #print 'lamb',lamb, loglamb
+        #raw_input()
+        logsum = []
+        for i in range(len(N_i)):
+          logsum.append(np.sum(np.log(1+(a_i[i])*(N_i[i:-1]-N_i[-1])))+np.log(1))
+        logsum = np.asarray(logsum)
+        if verbose:
+          print 'calculating logsum'
+          print 'a_i',a_i
+          print 'N_i',N_i
+          print 'logsum',logsum
+          print 'slope (lambda*a)', lamb*a_i
+        if np.any(np.isnan(logsum)):
+          print a_i, N_i[:-1],N_i[-1]
+          print 'logsum nan:',1+(a_i[i])*(N_i[i:-1]-N_i[-1])
+        #return N_k * loglamb + N_k * np.where(np.isnan(logsum),-100,logsum) - N_k
+        return (N_k) * loglamb + (N_k) * logsum -N_k
+        #return (N_k+1) * logsum
+        #return (lamb**N_k+np.prod(1+a_i*(N_i-N_i[-1])))/10.0**100
 
-          #return N_k * loglamb + N_k * np.where(np.isnan(np.log(1+a_i*(T_k))),-100,np.log(1+a_i*(T_k)))
-          #return N_k * loglamb
-        else:
-          return N_k
+        #return N_k * loglamb + N_k * np.where(np.isnan(np.log(1+a_i*(M_k))),-100,np.log(1+a_i*(M_k)))
+        #return N_k * loglamb
 
     def prior(self, N, Ntot):
         if self.gamma is not None:
@@ -452,13 +468,18 @@ def bayesian_blocks(t, x=None, sigma=None,
     # Start with first data cell; add one cell at each iteration
     #-----------------------------------------------------------------
     for R in range(N):
-        print R
+        print R, t[R]
         # Compute fit_vec : fitness of putative last block (end at R)
         kwds = {}
 
         # T_k: width/duration of each block
         if 'T_k' in fitfunc.args:
             kwds['T_k'] = block_length[:R + 1] - block_length[R + 1]
+
+        # M_k: width of each block, assuming points are located at bin edges
+        if 'M_k' in fitfunc.args:
+          kwds['M_k'] = t[R]-t[:R+1]
+          #kwds['M_k'] = block_length[:R + 1] - block_length[R + 1]
 
         # N_k: number of elements in each block
         if 'N_k' in fitfunc.args:
@@ -478,23 +499,29 @@ def bayesian_blocks(t, x=None, sigma=None,
 
         # N_i: all block elements
         if 'N_i' in fitfunc.args:
-          kwds['N_i'] = edges[:R+2]
+          kwds['N_i'] = t[:R+1]
+          #kwds['N_i'] = block_length[:R+1]
 
         # evaluate fitness function
         fit_vec = fitfunc.fitness(**kwds)
-        if np.any(np.isnan(fit_vec)):
-          raise Exception('fuck! nans! logs of negs!')
-        if np.any(np.isinf(fit_vec)):
-          raise Exception('shit! infs! what the hell?!')
-        #print fit_vec
-        #raw_input()
+        #if np.any(np.isnan(fit_vec)):
+        #  raise Exception('fuck! nans! logs of negs!')
+        #if np.any(np.isinf(fit_vec)):
+        #  raise Exception('shit! infs! what the hell?!')
+        #print 'fit_vec', fit_vec
 
         A_R = fit_vec - fitfunc.prior(R + 1, N)
+        #A_R = fit_vec
+        print 'A_R', A_R
         A_R[1:] += best[:R]
+        print 'A_R after best', A_R
 
         i_max = np.argmax(A_R)
         last[R] = i_max
         best[R] = A_R[i_max]
+        print 'last:',last
+        print 'best:',best
+        #raw_input()
 
     #-----------------------------------------------------------------
     # Now find changepoints by iteratively peeling off the last block
@@ -509,5 +536,8 @@ def bayesian_blocks(t, x=None, sigma=None,
             break
         ind = last[ind - 1]
     change_points = change_points[i_cp:]
+    change_points[-1] = change_points[-1]-1 # temp line for using t instead of edges
+    print 'change_points',change_points
 
-    return edges[change_points]
+    #return edges[change_points]
+    return t[change_points]
