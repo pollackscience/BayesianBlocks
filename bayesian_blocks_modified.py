@@ -83,7 +83,7 @@ class PolyEvents(FitnessFunc):
         p ~ gamma^N.  If gamma is specified, p0 is ignored.
     """
     def fitness(self, N_k, M_k, N_i):
-        verbose = True
+        verbose = False
         # eq. 19 from Scargle 2012
         #a = (N_k-2)/(T_k*(N_k-1))
         if(verbose):
@@ -176,11 +176,15 @@ class PolyEvents(FitnessFunc):
           print 'N_i',N_i
           print 'logsum',logsum
           print 'slope (lambda*a)', lamb*a_i
+          print 'y_in', lamb*(1-a_i*M_k)
+          print 'y_fin', lamb
         if np.any(np.isnan(logsum)):
           print a_i, N_i[:-1],N_i[-1]
           print 'logsum nan:',1+(a_i[i])*(N_i[i:-1]-N_i[-1])
         #return N_k * loglamb + N_k * np.where(np.isnan(logsum),-100,logsum) - N_k
-        return (N_k) * loglamb + (N_k) * logsum -N_k
+        y_in = lamb*(1-a_i*M_k)
+        y_fin = lamb
+        return (N_k) * loglamb + (N_k) * logsum
         #return (N_k+1) * logsum
         #return (lamb**N_k+np.prod(1+a_i*(N_i-N_i[-1])))/10.0**100
 
@@ -218,6 +222,7 @@ class Events(FitnessFunc):
         else:
             # eq. 21 from Scargle 2012
             return 4 - np.log(73.53 * self.p0 * (N ** -0.478))
+            #return 3000 - np.log(73.53 * self.p0 * (N ** -0.478))
 
 
 
@@ -468,7 +473,7 @@ def bayesian_blocks(t, x=None, sigma=None,
     # Start with first data cell; add one cell at each iteration
     #-----------------------------------------------------------------
     for R in range(N):
-        print R, t[R]
+        #print R, t[R]
         # Compute fit_vec : fitness of putative last block (end at R)
         kwds = {}
 
@@ -512,15 +517,15 @@ def bayesian_blocks(t, x=None, sigma=None,
 
         A_R = fit_vec - fitfunc.prior(R + 1, N)
         #A_R = fit_vec
-        print 'A_R', A_R
+        #print 'A_R', A_R
         A_R[1:] += best[:R]
-        print 'A_R after best', A_R
+        #print 'A_R after best', A_R
 
         i_max = np.argmax(A_R)
         last[R] = i_max
         best[R] = A_R[i_max]
-        print 'last:',last
-        print 'best:',best
+        #print 'last:',last
+        #print 'best:',best
         #raw_input()
 
     #-----------------------------------------------------------------
@@ -536,8 +541,8 @@ def bayesian_blocks(t, x=None, sigma=None,
             break
         ind = last[ind - 1]
     change_points = change_points[i_cp:]
-    change_points[-1] = change_points[-1]-1 # temp line for using t instead of edges
-    print 'change_points',change_points
+    #change_points[-1] = change_points[-1]-1 # temp line for using t instead of edges
+    #print 'change_points',change_points
 
-    #return edges[change_points]
-    return t[change_points]
+    return edges[change_points]
+    #return t[change_points]

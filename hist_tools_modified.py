@@ -6,10 +6,11 @@ from astroML.density_estimation import\
     scotts_bin_width, freedman_bin_width,\
     knuth_bin_width
 
+#from bb_poly import bayesian_blocks
 from bayesian_blocks_modified import bayesian_blocks
 
 
-def hist(x, bins=10, range=None, fitness='events', gamma = None, p0=0.05, *args, **kwargs):
+def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *args, **kwargs):
     """Enhanced histogram
 
     This is a histogram function that enables the use of more sophisticated

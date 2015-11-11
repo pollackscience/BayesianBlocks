@@ -3,7 +3,6 @@
 #from bayesianBlocks import *
 import numpy as np
 from astroML.plotting import hist
-from astroML.
 import matplotlib.pyplot as plt
 import pandas as pd
 import cPickle as pkl
@@ -29,8 +28,8 @@ def generateToy():
   plt.axes().set_ylim(0.0000001,0.17)
   hist(z_data_subset,range=plot_range,bins=100,normed=1,histtype='stepfilled',
       color=['lightgrey'], label=['100 bins'])
-  hist(z_data_subset,range=plot_range,bins='knuth',normed=1,histtype='step',linewidth=1.5,
-      color=['navy'], label=['knuth'])
+  #hist(z_data_subset,range=plot_range,bins='knuth',normed=1,histtype='step',linewidth=1.5,
+  #    color=['navy'], label=['knuth'])
   hist(z_data_subset,range=plot_range,bins='blocks',normed=1,histtype='step',linewidth=2.0,
       color=['crimson'], label=['b blocks'])
   plt.legend()
