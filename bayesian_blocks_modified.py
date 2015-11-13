@@ -12,10 +12,6 @@ References
 """
 from __future__ import division
 import numpy as np
-from sympy.solvers import solve
-from sympy import Symbol
-from sympy.functions import re
-from sympy.mpmath import *
 from scipy import optimize
 # TODO: implement other fitness functions from appendix B of Scargle 2012
 
@@ -92,7 +88,6 @@ class PolyEvents(FitnessFunc):
           print 'N_k',N_k
           print 'M_k',M_k
         #raw_input()
-        x = Symbol('x')
         a_i = []
 
         def f_a(a,M_k,N_k,N_i,i):
@@ -130,19 +125,6 @@ class PolyEvents(FitnessFunc):
 
             #a_sol = optimize.newton(f_a,start_val,args=(M_k,N_k,N_i,i),maxiter=5000)
             a_sol = optimize.brentq(f_a,lower_bound,upper_bound,args=(M_k,N_k,N_i,i),maxiter=5000)
-            #a_sol = start_val
-            #print a_sol
-            #a_sol = a_sol.x[0]
-
-
-            #f2 = lambda a: f_a(a,M_k,N_k,N_i,i)
-            #a_sol = findroot(lambda a: 2/M_k[i] - a + N_k[i] * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1,start_val)
-            #a_sol = findroot(f2,start_val+1,tol=0.0001,solver = 'newton')
-            #a_sol = findroot(f2,start_val, tol = 0.0001,solver='halley')
-            #a_sol = findroot(f2,start_val,solver='anderson')
-            #start_val = a_sol
-            #a_sol = 1
-
 
             if verbose:
               print 'a_sol', a_sol

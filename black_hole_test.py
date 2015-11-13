@@ -26,15 +26,15 @@ ROOT.gRandom.SetSeed(8675309)
 ST_dict_data = pkl.load(open( "files/BHTree.p", "rb" ))
 print 'pickle loaded'
 
-ST_dict_data[mult]=[i for i in  ST_dict_data[mult] if i>1900]
+ST_dict_data[mult]=[i for i in  ST_dict_data[mult] if i>2300]
 nentries = len(ST_dict_data[mult])
 print nentries
 
-my_pdf = TF1("my_pdf","2.3949e6*3.74/(0.67472+x)**10.1809",1900,5500)
+my_pdf = TF1("my_pdf","2.3949e6*3.74/(0.67472+x)**10.1809",2300,6000)
 #my_pdf = TF1("my_pdf","2.3949e6/(0.67472+x)**10.1809",1900,5500)
 my_rands = []
 #for i in xrange(nentries):
-for i in xrange(50000):
+for i in xrange(nentries):
     my_rands.append(my_pdf.GetRandom())
 
 normed_counts_mc, bb_edges = np.histogram(my_rands,bayesian_blocks(my_rands), density=True)
