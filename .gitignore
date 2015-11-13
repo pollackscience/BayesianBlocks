@@ -64,6 +64,7 @@ target/
 *.gz
 *.p
 *.dat
+*.root
 
 # MSFT Files
 *.doc*
