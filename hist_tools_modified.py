@@ -42,8 +42,11 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
         other keyword arguments are described in pylab.hist().
     """
     if isinstance(bins, str) and "weights" in kwargs:
-        warnings.warn("weights argument is not supported: it will be ignored.")
-        kwargs.pop('weights')
+        #warnings.warn("weights argument is not supported: it will be ignored.")
+        #kwargs.pop('weights')
+        weights = kwargs['weights']
+    else:
+        weights = None
 
     x = np.asarray(x)
 
@@ -64,7 +67,7 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
         x = x[(x >= range[0]) & (x <= range[1])]
 
     if bins in ['blocks']:
-        bins = bayesian_blocks(x,fitness=fitness,p0=p0,gamma=gamma)
+        bins = bayesian_blocks(t=x,x=weights,fitness=fitness,p0=p0,gamma=gamma)
     elif bins in ['knuth', 'knuths']:
         dx, bins = knuth_bin_width(x, True, disp=False)
     elif bins in ['scott', 'scotts']:

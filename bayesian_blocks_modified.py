@@ -367,8 +367,8 @@ def bayesian_blocks(t, x=None, sigma=None,
 
     # verify the fitness function
     if fitness == 'events':
-        if x is not None and np.any(x % 1 > 0):
-            raise ValueError("x must be integer counts for fitness='events'")
+        #if x is not None and np.any(x % 1 > 0):
+        #    raise ValueError("x must be integer counts for fitness='events'")
         fitfunc = Events(p0,gamma)
     elif fitness == 'poly_events':
         if x is not None and np.any(x % 1 > 0):
@@ -381,7 +381,7 @@ def bayesian_blocks(t, x=None, sigma=None,
     elif fitness == 'measures':
         if x is None:
             raise ValueError("x must be specified for fitness='measures'")
-        fitfunc = PointMeasures(**kwargs)
+        fitfunc = PointMeasures(p0,gamma)
     else:
         if not (hasattr(fitness, 'args') and
                 hasattr(fitness, 'fitness') and

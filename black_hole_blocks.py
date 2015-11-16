@@ -13,12 +13,12 @@ from ROOT import gDirectory
 plt.close('all')
 normed = True
 log = True
-ST_low = 1900
+ST_low = 2300
 
 df_mc = pkl.load(open('files/BHTree_mc.p','rb'))
 df_data = pkl.load(open('files/BHTree_data.p','rb'))
 
-for ST in range(2,11):
+for ST in [10]:
     my_ST = df_mc[df_mc['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)].values
     my_weights = df_mc[df_mc['ST_mul'+str(ST)]>ST_low]['weightTree'].values
     fig = plt.figure()
@@ -28,7 +28,7 @@ for ST in range(2,11):
     p0=0.01
     hist(my_ST, weights = my_weights, bins = 'blocks', fitness = 'events', p0=p0,  ax = ax, histtype='step', label='Bayesian Blocks', linewidth=2,normed=normed,log=log)
     ax.legend()
-    plt.title(key)
+    plt.title('ST_mul'+str(ST))
     plt.xlabel('ST (GeV)')
     if normed:
         plt.ylabel(r'N/$\Sigma$N$\Delta$x')
