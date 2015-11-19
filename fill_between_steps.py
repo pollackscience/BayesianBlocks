@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.ma as ma
+import collections
 
 def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
     ''' fill between a step plot and
@@ -31,19 +32,12 @@ def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
 
     if len(x) == len(y1)+1:
         kwargs['linewidth']=0
-        a = fill_between_steps(ax, x[0:2], y1[0:2], y2=y2, step_where='post', **kwargs)
+        if isinstance(y2,collections.Container):
+            _y2 = y2[0:2]
+        else:
+            _y2 = y2
+        a = fill_between_steps(ax, x[0:2], y1[0:2], y2=_y2, step_where='post', **kwargs)
         kwargs['label']=None
-        #try:
-        #    label = kwargs['label']
-        #    try:
-        #        alpha = kwargs['alpha']
-        #    except:
-        #        alpha = None
-        #    color = a.get_facecolor()[0]
-##
-#            ax.plot([],[],linewidth=10,alpha = alpha,color = color, label = label)
-#        except:
-#            pass
         return fill_between_steps(ax, x[1:], y1, y2=y2, step_where='pre', **kwargs)
     if step_where not in {'pre', 'post', 'mid'}:
         raise ValueError("where must be one of {{'pre', 'post', 'mid'}} "
