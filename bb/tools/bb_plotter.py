@@ -57,11 +57,11 @@ def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = Non
     else: suffix = mode
 
     if data_driven:
-        save_name = 'plots/ST_mul'+label+'_mc_and_data_normed_databin'
+        save_name = '../../plots/ST_mul'+label+'_mc_and_data_normed_databin'
         if suffix: save_name+='_'+suffix
         save_name+='.pdf'
     else:
-        save_name = 'plots/ST_mul'+label+'_mc_and_data_normed_mcbin'
+        save_name = '../../plots/ST_mul'+label+'_mc_and_data_normed_mcbin'
         if suffix: save_name+='_'+suffix
         save_name+='.pdf'
     plt.savefig(save_name)

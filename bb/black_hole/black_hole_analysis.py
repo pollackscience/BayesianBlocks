@@ -3,12 +3,12 @@
 from __future__ import division
 import numpy as np
 from scipy import stats
-from bayesian_blocks_modified import bayesian_blocks
+from bb.tools.bayesian_blocks_modified import bayesian_blocks
 from matplotlib import pyplot as plt
 import cPickle as pkl
 import scipy.stats as st
 import cPickle as pkl
-from bb_plotter import make_hist_ratio_blackhole
+from bb.tools.bb_plotter import make_hist_ratio_blackhole
 
 def do_bh_analysis():
 
@@ -29,9 +29,9 @@ def do_bh_analysis():
     else:
         signal_num = 0
 
-    df_mc = pkl.load(open('files/BHTree_mc.p','rb'))
-    df_signal = pkl.load(open('files/BHTree_signal.p','rb'))
-    df_data = pkl.load(open('files/BHTree_data.p','rb'))
+    df_mc = pkl.load(open('../../files/BHTree_mc.p','rb'))
+    df_signal = pkl.load(open('../../files/BHTree_signal.p','rb'))
+    df_data = pkl.load(open('../../files/BHTree_data.p','rb'))
 
     weights = df_mc.weightTree.unique()#[0.27436519,0.0401976,0.01657276]
     df_mc_list = []
