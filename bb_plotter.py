@@ -10,7 +10,7 @@ from fill_between_steps import fill_between_steps
 from matplotlib.ticker import MaxNLocator
 
 
-def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = None, data_driven=True, signal=None, inject=False):
+def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = None, data_driven=True, signal=None, mode='no_signal'):
     bin_centres = (bin_edges[:-1] + bin_edges[1:])/2.
     fig = plt.figure()
     gs = gridspec.GridSpec(2,1,height_ratios=[3,1])
@@ -23,16 +23,17 @@ def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = Non
     #ax = plt.gca()
     ax1.set_yscale("log", nonposy='clip')
     fill_between_steps(ax1, bin_edges, mc,1e-4, alpha=0.2, step_where='pre',linewidth=0,label='QCD MC')
-    if signal != None:
+    if mode in ['signal_search','signal_search_inj']:
         fill_between_steps(ax1, bin_edges,mc+signal,mc,alpha=0.6,step_where='pre',linewidth=0,label='Signal', color='darkgreen')
     ax1.errorbar(bin_centres, data, yerr=data_err, fmt='ok',label='data')
 #plt.semilogy()
     ax1.legend()
+    ax1.set_ylim(1e-4,ax1.get_ylim()[1])
     if data_driven:
         ax1.set_title('ST_mult '+label+' QCD MC and real data, binned from data')
     else:
         ax1.set_title('ST_mult '+label+' QCD MC and real data, binned from MC')
-    if signal != None:
+    if mode in ['signal_search','signal_search_inj']:
         ratio = data/(mc+signal)
         ratio_err = data_err/(mc+signal)
     else:
@@ -47,20 +48,13 @@ def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = Non
     #ylims = ax2.get_ylim()
     #if ylims[0]>1: ylims[0] = 0.995
     #if ylims[1]<1: ylims[1] = 1.005
-    print ylims
     ax2.set_ylim(ylims[0],ylims[1])
     ax2.get_yaxis().get_major_formatter().set_useOffset(False)
     ax2.axhline(1,linewidth=2,color='r')
     tickbins = len(ax1.get_yticklabels()) # added
     ax2.yaxis.set_major_locator(MaxNLocator(nbins=7, prune='upper'))
-    print ax2.get_yticklabels()
-    if signal != None:
-        if inject:
-            try: suffix = '_'.join([suffix,'signal_inject'])
-            except: suffix='signal_inject'
-        else:
-            try: suffix = '_'.join([suffix,'signal_shape'])
-            except: suffix='signal_shape'
+    if suffix: suffix = '_'.join([suffix,mode])
+    else: suffix = mode
 
     if data_driven:
         save_name = 'plots/ST_mul'+label+'_mc_and_data_normed_databin'
