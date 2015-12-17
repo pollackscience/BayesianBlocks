@@ -20,9 +20,11 @@ def do_bh_analysis():
     samples = 5000
     seed = 2
     p0=0.005
-    data_driven = True
-    mode = 'signal_inj' #'no_signal','signal_search','signal_inj','signal_search_inj'
+    bg_est = 'low_ST' #'data_driven','mc','low_ST'
+    mode = 'no_signal' #'no_signal','signal_search','signal_inj','signal_search_inj'
+
     if mode not in ['no_signal','signal_search','signal_inj','signal_search_inj']: raise KeyError('mode is not allowed!')
+    if bg_est not in ['data_driven','mc','low_ST']: raise KeyError('bg_est is not allowed!')
 
     if mode in ['signal_search','signal_inj','signal_search_inj']:
         signal_num = 10
@@ -43,17 +45,21 @@ def do_bh_analysis():
     #for ST in [10]:
         my_ST_data = df_data[df_data['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)].values
         nentries = len(my_ST_data)
-        df_mc_st_list = [df[df['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)] for df in df_mc_list]
-        if mode in ['signal_search','signal_inj','signal_search_inj']:
-            my_ST_signal = df_signal[df_signal['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)]
         my_ST_mc = []
+        if bg_est == 'low_ST':
+            my_ST_mc = df_data[df_data['ST_mul2']>ST_low][df_data['n_multiplicity']==2]['ST_mul2'].values
+        else:
+            df_mc_st_list = [df[df['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)] for df in df_mc_list]
+            if mode in ['signal_search','signal_inj','signal_search_inj']:
+                my_ST_signal = df_signal[df_signal['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)]
 
-        samples,rel_weights = find_sample_number(df_mc_st_list,weights)
-        for i,mc in enumerate(df_mc_st_list):
-            my_ST_mc = np.append(my_ST_mc, mc.sample(int(samples*rel_weights[i]),random_state=seed).values)
+            samples,rel_weights = find_sample_number(df_mc_st_list,weights)
+            for i,mc in enumerate(df_mc_st_list):
+                my_ST_mc = np.append(my_ST_mc, mc.sample(int(samples*rel_weights[i]),random_state=seed).values)
 
-        print 'n_data',nentries
-        print 'n_mc',len(my_ST_mc)
+        print 'ST_mult',ST
+        print '   n_data',nentries
+        print '   n_mc',len(my_ST_mc)
 
 #get the edges from bb, and the normalized bin values (integral of all hists is 1)
         #if signal and inject:
@@ -92,13 +98,18 @@ def do_bh_analysis():
         rescaled_err = np.sqrt(counts_data)/(bb_edges[1:]-bb_edges[:-1])
         rescaled_err_nobb = np.sqrt(counts_data_nobb)/(nobb_edges[1:]-nobb_edges[:-1])
         err = np.sqrt(counts_data)
+#properly account for the BG error for ratio plot
+        counts_bg, _= np.histogram(my_ST_mc,bb_edges)
+        counts_bg_nobb, _= np.histogram(my_ST_mc,nobb_edges)
+        rescaled_err_bg = np.sqrt(counts_bg)/(bb_edges[1:]-bb_edges[:-1])
+        rescaled_err_bg_nobb = np.sqrt(counts_bg_nobb)/(nobb_edges[1:]-nobb_edges[:-1])
 
         if mode in ['signal_search','signal_search_inj']:
-            make_hist_ratio_blackhole(bb_edges, rescaled_counts_data, rescaled_counts_mc, rescaled_err, str(ST), suffix = None, data_driven=data_driven, signal = rescaled_counts_signal, mode = mode)
-            make_hist_ratio_blackhole(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', data_driven=data_driven, signal = rescaled_counts_signal_nobb, mode=mode)
+            make_hist_ratio_blackhole(bb_edges, rescaled_counts_data, rescaled_counts_mc, rescaled_err, str(ST), suffix = None, bg_est=bg_est, signal = rescaled_counts_signal, mode = mode)
+            make_hist_ratio_blackhole(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', bg_est=bg_est, signal = rescaled_counts_signal_nobb, mode=mode)
         else:
-            make_hist_ratio_blackhole(bb_edges, rescaled_counts_data, rescaled_counts_mc, rescaled_err, str(ST), suffix = None, data_driven=data_driven, mode=mode)
-            make_hist_ratio_blackhole(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', data_driven=data_driven, mode=mode)
+            make_hist_ratio_blackhole(bb_edges, rescaled_counts_data, rescaled_counts_mc, rescaled_err, str(ST), suffix = None, bg_est=bg_est, mode=mode)
+            make_hist_ratio_blackhole(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', bg_est=bg_est, mode=mode)
 
         plt.show()
 
