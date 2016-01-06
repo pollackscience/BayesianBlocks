@@ -16,11 +16,13 @@ def do_bh_analysis():
     plt.close('all')
     normed = True
     log = True
-    ST_low = 2300
+    STs = [2,3,4,5,6,7,8,9,10]
+    ST_low = [2300,2300,2300,2600,2600,2600,2800,2800,2900]
+    ST_low_dict = dict(zip(STs,ST_low))
     samples = 5000
     seed = 2
     p0=0.005
-    bg_est = 'low_ST' #'data_driven','mc','low_ST'
+    bg_est = 'data_driven' #'data_driven','mc','low_ST'
     mode = 'no_signal' #'no_signal','signal_search','signal_inj','signal_search_inj'
 
     if mode not in ['no_signal','signal_search','signal_inj','signal_search_inj']: raise KeyError('mode is not allowed!')
@@ -43,18 +45,19 @@ def do_bh_analysis():
     all_edges = {}
     for ST in range(2,11):
     #for ST in [10]:
-        my_ST_data = df_data[df_data['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)].values
+        my_ST_data = df_data[df_data['ST_mul'+str(ST)]>ST_low_dict[ST]]['ST_mul'+str(ST)].values
         nentries = len(my_ST_data)
         my_ST_mc = []
         if bg_est == 'low_ST':
-            my_ST_mc = df_data[df_data['ST_mul2']>ST_low][df_data['n_multiplicity']==2]['ST_mul2'].values
+            my_ST_mc = df_data[df_data['ST_mul2']>ST_low_dict[ST]][df_data['n_multiplicity']==2]['ST_mul2'].values
         else:
-            df_mc_st_list = [df[df['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)] for df in df_mc_list]
+            df_mc_st_list = [df[df['ST_mul'+str(ST)]>ST_low_dict[ST]]['ST_mul'+str(ST)] for df in df_mc_list]
             if mode in ['signal_search','signal_inj','signal_search_inj']:
-                my_ST_signal = df_signal[df_signal['ST_mul'+str(ST)]>ST_low]['ST_mul'+str(ST)]
+                my_ST_signal = df_signal[df_signal['ST_mul'+str(ST)]>ST_low_dict[ST]]['ST_mul'+str(ST)]
 
             samples,rel_weights = find_sample_number(df_mc_st_list,weights)
             for i,mc in enumerate(df_mc_st_list):
+                if samples*rel_weights[i]==0: continue
                 my_ST_mc = np.append(my_ST_mc, mc.sample(int(samples*rel_weights[i]),random_state=seed).values)
 
         print 'ST_mult',ST
@@ -124,6 +127,7 @@ def find_sample_number(df_list,weights):
     props = [len(df_list[i])*weights[i] for i in range(len(df_list))]
     props = [i/min(props) for i in props]
     props = [i/sum(props) for i in props]
+    props = [np.nan_to_num(i) for i in props]
     for sample in range(min(map(len,df_list)), max(map(len,df_list))):
         for j in range(len(props)):
             if int(sample*props[j])>len(df_list[j]):

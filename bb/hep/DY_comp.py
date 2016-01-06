@@ -23,7 +23,7 @@ else:
 print 'loaded'
 #print z_data[0:20]
 
-make_comp_plots(z_data[0:50000], 0.01, bb_dir)
+make_comp_plots(z_data[0:50000], 0.01, bb_dir+'/plots/',title=r'Z$\to\mu\mu$ Data', xlabel=r'$m_{\ell\ell}$ (GeV)', ylabel='A.U.',save_name='z_data_hist')
 '''
 plt.yscale('log', nonposy='clip')
 hist(z_data[0:50000],'knuth',histtype='stepfilled',alpha=0.2,label='knuth',normed=True)
