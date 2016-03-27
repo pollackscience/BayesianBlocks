@@ -5,9 +5,18 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
 from hist_tools_modified import hist
-from bayesian_blocks_modified import bayesian_blocks
 from fill_between_steps import fill_between_steps
 from matplotlib.ticker import MaxNLocator
+
+from astroML.density_estimation import\
+    scotts_bin_width, freedman_bin_width,\
+    knuth_bin_width
+#from bb_poly import bayesian_blocks
+from bayesian_blocks_modified import bayesian_blocks
+
+from plotly.offline import download_plotlyjs, init_notebook_mode, iplot, plot
+import plotly.graph_objs as go
+import plotly.plotly as py
 
 
 def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = None, bg_est='data_driven', signal=None, mode='no_signal'):
@@ -159,3 +168,31 @@ def make_comp_plots(data, p0, save_dir,title='Plot of thing vs thing', xlabel='X
     plt.ylabel(ylabel)
     plt.title(title)
     plt.savefig(save_dir+save_name+'_freedman.pdf')
+
+def make_comp_plots_plotly(data, p0, save_dir='/Users/brianpollack/Documents/PersonalWebPage/bb_plots/',title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot'):
+    layout = go.Layout(
+                    title = title,
+                    autosize=False,
+                    width=675,
+                    height=650,
+                    xaxis=dict(title=xlabel),
+                    yaxis=dict(title=ylabel,type='log'),
+                    )
+    bb_edges = bayesian_blocks(data,p0=p0)
+    fig = plt.figure()
+    plt.yscale('log', nonposy='clip')
+    hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=True)
+    hist(data,bins=bb_edges,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=True)
+    plt.legend()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    py.plot_mpl(fig,save_dir+save_name+'.html')
+    #plt.savefig(save_dir+save_name+'_binsVbb.pdf')
+
+    #uniform_hist = go.Histogram(x=data,name='Uniform bin size', histnorm='count')
+    #bb_hist = go.Histogram(x=data,name='Bayesian Blocks',)
+    #plotly_hists = [bins_regular]
+    #fig = go.Figure(data=plotly_hists,layout=layout)
+    #plot_html = new_iplot(fig,show_link=False)
+    #plot(fig,filename = save_dir+save_name+'.html')

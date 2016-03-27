@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 import cPickle as pkl
 import scipy.stats as st
 import cPickle as pkl
-from bb.tools.bb_plotter import make_comp_plots
+from bb.tools.bb_plotter import make_comp_plots, make_comp_plots_plotly
 from bb.tools.hist_tools_modified import hist
 import os
 
@@ -23,7 +23,8 @@ else:
 print 'loaded'
 #print z_data[0:20]
 
-make_comp_plots(z_data[0:50000], 0.01, bb_dir+'/plots/',title=r'Z$\to\mu\mu$ Data', xlabel=r'$m_{\ell\ell}$ (GeV)', ylabel='A.U.',save_name='z_data_hist')
+#make_comp_plots(z_data[0:50000], 0.01, bb_dir+'/plots/',title=r'Z$\to\mu\mu$ Data', xlabel=r'$m_{\ell\ell}$ (GeV)', ylabel='A.U.',save_name='z_data_hist')
+make_comp_plots_plotly(z_data[0:50000], 0.01, title='Drell-Yan to dimuon', xlabel='M_Z (GeV)', ylabel='A.U.',save_name='plotly_test')
 '''
 plt.yscale('log', nonposy='clip')
 hist(z_data[0:50000],'knuth',histtype='stepfilled',alpha=0.2,label='knuth',normed=True)
