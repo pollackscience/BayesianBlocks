@@ -169,25 +169,29 @@ def make_comp_plots(data, p0, save_dir,title='Plot of thing vs thing', xlabel='X
     plt.title(title)
     plt.savefig(save_dir+save_name+'_freedman.pdf')
 
-def make_comp_plots_plotly(data, p0, save_dir='/Users/brianpollack/Documents/PersonalWebPage/bb_plots/',title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot'):
-    layout = go.Layout(
-                    title = title,
-                    autosize=False,
-                    width=675,
-                    height=650,
-                    xaxis=dict(title=xlabel),
-                    yaxis=dict(title=ylabel,type='log'),
-                    )
-    bb_edges = bayesian_blocks(data,p0=p0)
-    fig = plt.figure()
-    plt.yscale('log', nonposy='clip')
-    hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=True)
-    hist(data,bins=bb_edges,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=True)
-    plt.legend()
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.title(title)
-    py.plot_mpl(fig,save_dir+save_name+'.html')
+###################################################################
+# Plotly currently does not have variable bin width functionality #
+###################################################################
+
+#def make_comp_plots_plotly(data, p0, save_dir='/Users/brianpollack/Documents/PersonalWebPage/bb_plots/',title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot'):
+#    layout = go.Layout(
+#                    title = title,
+#                    autosize=False,
+#                    width=675,
+#                    height=650,
+#                    xaxis=dict(title=xlabel),
+#                    yaxis=dict(title=ylabel,type='log'),
+#                    )
+#    bb_edges = bayesian_blocks(data,p0=p0)
+#    fig = plt.figure()
+#    plt.yscale('log', nonposy='clip')
+#    hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=True)
+#    hist(data,bins=bb_edges,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=True)
+#    plt.legend()
+#    plt.xlabel(xlabel)
+#    plt.ylabel(ylabel)
+#    plt.title(title)
+#    py.plot_mpl(fig,save_dir+save_name+'.html')
     #plt.savefig(save_dir+save_name+'_binsVbb.pdf')
 
     #uniform_hist = go.Histogram(x=data,name='Uniform bin size', histnorm='count')
@@ -196,3 +200,23 @@ def make_comp_plots_plotly(data, p0, save_dir='/Users/brianpollack/Documents/Per
     #fig = go.Figure(data=plotly_hists,layout=layout)
     #plot_html = new_iplot(fig,show_link=False)
     #plot(fig,filename = save_dir+save_name+'.html')
+
+def make_bb_plot(data, p0, save_dir,title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot', overlay_reg_bins = True, edges=None,scale=None):
+    if edges != None:
+        bb_edges=edges
+    else:
+        bb_edges = bayesian_blocks(data,p0=p0)
+    plt.figure()
+    bin_content = np.histogram(data,bb_edges,density=True)[0]
+    #plt.yscale('log', nonposy='clip')
+
+    hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=True,scale=scale)
+    #hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=False)
+    hist(data,bins=bb_edges,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=True,scale=scale)
+    #fill_between_steps(plt.gca(), bb_edges, bin_content*len(data),bin_content*len(data)/2, alpha=0.5, step_where='pre',linewidth=2,label='norm attempt')
+    plt.legend()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.savefig(save_dir+save_name+'_bb.pdf')
+    return bb_edges

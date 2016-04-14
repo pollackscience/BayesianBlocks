@@ -8,6 +8,7 @@ from astroML.density_estimation import\
 
 #from bb_poly import bayesian_blocks
 from bayesian_blocks_modified import bayesian_blocks
+from fill_between_steps import fill_between_steps
 
 
 def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *args, **kwargs):
@@ -42,8 +43,10 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
         other keyword arguments are described in pylab.hist().
     """
     if isinstance(bins, str) and "weights" in kwargs:
-        #warnings.warn("weights argument is not supported: it will be ignored.")
-        #kwargs.pop('weights')
+        warnings.warn("weights argument is not supported: it will be ignored.")
+        kwargs.pop('weights')
+        weights = None
+    elif "weights" in kwargs:
         weights = kwargs['weights']
     else:
         weights = None
@@ -66,8 +69,8 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
                                         'freedman', 'freedmans'])):
         x = x[(x >= range[0]) & (x <= range[1])]
 
-    if bins in ['blocks']:
-        bins = bayesian_blocks(t=x,x=weights,fitness=fitness,p0=p0,gamma=gamma)
+    if bins in ['block','blocks']:
+        bins = bayesian_blocks(t=x,fitness=fitness,p0=p0,gamma=gamma)
     elif bins in ['knuth', 'knuths']:
         dx, bins = knuth_bin_width(x, True, disp=False)
     elif bins in ['scott', 'scotts']:
@@ -76,5 +79,31 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
         dx, bins = freedman_bin_width(x, True)
     elif isinstance(bins, str):
         raise ValueError("unrecognized bin code: '%s'" % bins)
+
+    if 'scale' in kwargs and kwargs['scale'] == None:
+        kwargs.pop('scale')
+    elif 'scale' in kwargs:
+        scale = kwargs.pop('scale')
+        if 'normed' in kwargs:
+            normed = kwargs.pop('normed')
+        else:
+            normed = False
+        bin_content, bins = np.histogram(x,bins,range,weights=weights,density=normed)
+        #return fill_between_steps(ax, bins, bin_content*scale,0, step_where='pre', **kwargs)
+        width = bins[1:]-bins[:-1]
+        if 'histtype' in kwargs:
+            histtype = kwargs.pop('histtype')
+            if histtype=='bar':
+                pass
+            elif histtype=='stepfilled':
+                kwargs['linewidth']=0
+        else: histtype='bar'
+
+        if histtype=='step':
+            ax.step(bins[0:2], bin_content[0:2]*scale, where='post', **kwargs)
+            kwargs['label']=None
+            return ax.step(bins[1:], bin_content*scale, where='pre', **kwargs)
+        else:
+            return ax.bar(bins[:-1],bin_content*scale,width,**kwargs)
 
     return ax.hist(x, bins, range, **kwargs)

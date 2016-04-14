@@ -83,52 +83,51 @@ class PolyEvents(FitnessFunc):
         # eq. 19 from Scargle 2012
         #a = (N_k-2)/(T_k*(N_k-1))
         if(verbose):
-          print 'fitness call'
-          print 'N_i',N_i
-          print 'N_k',N_k
-          print 'M_k',M_k
+            print 'fitness call'
+            print 'N_i',N_i
+            print 'N_k',N_k
+            print 'M_k',M_k
         #raw_input()
         a_i = []
 
         def f_a(a,M_k,N_k,N_i,i):
-          return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1
-          #return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i+1:]-N_i[-1])/(1+a*(N_i[i+1:]-N_i[-1])))**-1
+            return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1
 
         for i in range(len(N_i)):
 
         #special cases
-          if N_k[i]==1:
-            a_i.append(np.inf)
-          elif N_k[i]==2:
-            a_i.append(0)
+            if N_k[i]==1:
+                a_i.append(np.inf)
+            elif N_k[i]==2:
+                a_i.append(0)
 
-          else:
+            else:
 
-            #upper_bound = 2.0/M_k[i]
-            upper_bound= min(1.0/(N_i[-1]-N_i[0]),2.0/M_k[i])
-            #upper_bound= max(1.0/(N_i[-1]-N_i[-2]),2.0/M_k[i])*2
-            lower_bound = upper_bound
-            #start_val = (lower_bound+upper_bound)/2.0
-            start_val = upper_bound/10.0
+                #upper_bound = 2.0/M_k[i]
+                upper_bound= min(1.0/(N_i[-1]-N_i[0]),2.0/M_k[i])
+                #upper_bound= max(1.0/(N_i[-1]-N_i[-2]),2.0/M_k[i])*2
+                lower_bound = upper_bound
+                #start_val = (lower_bound+upper_bound)/2.0
+                start_val = upper_bound/10.0
 
 
             while(np.sign(f_a(upper_bound,M_k,N_k,N_i,i))==np.sign(f_a(lower_bound,M_k,N_k,N_i,i))):
-              lower_bound-=0.1
+                lower_bound-=0.1
             if verbose:
-              print 'a_i loop'
-              print 'M_k', M_k[i]
-              print 'N_k', N_k[i]
-              print 'N_i', N_i
-              print 'upper', upper_bound, f_a(upper_bound,M_k,N_k,N_i,i)
-              print 'lower', lower_bound, f_a(lower_bound,M_k,N_k,N_i,i)
-              print f_a(x,M_k,N_k,N_i,i)
+                print 'a_i loop'
+                print 'M_k', M_k[i]
+                print 'N_k', N_k[i]
+                print 'N_i', N_i
+                print 'upper', upper_bound, f_a(upper_bound,M_k,N_k,N_i,i)
+                print 'lower', lower_bound, f_a(lower_bound,M_k,N_k,N_i,i)
+                print f_a(x,M_k,N_k,N_i,i)
 
             #a_sol = optimize.newton(f_a,start_val,args=(M_k,N_k,N_i,i),maxiter=5000)
             a_sol = optimize.brentq(f_a,lower_bound,upper_bound,args=(M_k,N_k,N_i,i),maxiter=5000)
 
             if verbose:
-              print 'a_sol', a_sol
-              raw_input()
+                print 'a_sol', a_sol
+                raw_input()
 
             a_i.append(a_sol)
 
@@ -137,32 +136,32 @@ class PolyEvents(FitnessFunc):
         lamb = (N_k)/((M_k)*(1-a_i*(M_k)/2.0))
         lamb = np.where(np.isinf(a_i),1,lamb) #if a is inf, lambda is 0
         if verbose:
-          print 'calculating lambda'
-          print 'a_i',a_i
-          print 'N_k',N_k
-          print 'M_k',M_k
-          print 'lamb', lamb
+            print 'calculating lambda'
+            print 'a_i',a_i
+            print 'N_k',N_k
+            print 'M_k',M_k
+            print 'lamb', lamb
         loglamb = np.log(lamb)
         if np.any(np.isnan(loglamb)):
-          print 'loglamb nan, man:',loglamb
+            print 'loglamb nan, man:',loglamb
         #loglamb = np.where(np.isnan(loglamb),-100,loglamb)
         #print 'lamb',lamb, loglamb
         #raw_input()
         logsum = []
         for i in range(len(N_i)):
-          logsum.append(np.sum(np.log(1+(a_i[i])*(N_i[i:-1]-N_i[-1])))+np.log(1))
+            logsum.append(np.sum(np.log(1+(a_i[i])*(N_i[i:-1]-N_i[-1])))+np.log(1))
         logsum = np.asarray(logsum)
         if verbose:
-          print 'calculating logsum'
-          print 'a_i',a_i
-          print 'N_i',N_i
-          print 'logsum',logsum
-          print 'slope (lambda*a)', lamb*a_i
-          print 'y_in', lamb*(1-a_i*M_k)
-          print 'y_fin', lamb
+            print 'calculating logsum'
+            print 'a_i',a_i
+            print 'N_i',N_i
+            print 'logsum',logsum
+            print 'slope (lambda*a)', lamb*a_i
+            print 'y_in', lamb*(1-a_i*M_k)
+            print 'y_fin', lamb
         if np.any(np.isnan(logsum)):
-          print a_i, N_i[:-1],N_i[-1]
-          print 'logsum nan:',1+(a_i[i])*(N_i[i:-1]-N_i[-1])
+            print a_i, N_i[:-1],N_i[-1]
+            print 'logsum nan:',1+(a_i[i])*(N_i[i:-1]-N_i[-1])
         #return N_k * loglamb + N_k * np.where(np.isnan(logsum),-100,logsum) - N_k
         y_in = lamb*(1-a_i*M_k)
         y_fin = lamb
