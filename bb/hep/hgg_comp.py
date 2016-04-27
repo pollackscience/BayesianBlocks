@@ -1,23 +1,16 @@
 #! /usr/bin/env python
 
 from __future__ import division
-import numpy as np
-from scipy import stats
-from bb.tools.bayesian_blocks_modified import bayesian_blocks
-from matplotlib import pyplot as plt
-import cPickle as pkl
-import scipy.stats as st
-import cPickle as pkl
-from bb.tools.bb_plotter import make_comp_plots, make_bb_plot
-from bb.tools.hist_tools_modified import hist
-import nllfitter.future_fitter as ff
-from nllfitter.fitter import fit_plot
 import os
-import pandas as pd
-from scipy.stats import norm
-from ROOT import TF1
-from ROOT import TRandom3
 import functools
+import numpy as np
+import cPickle as pkl
+from matplotlib import pyplot as plt
+from bb.tools.bayesian_blocks_modified import bayesian_blocks
+from bb.tools.bb_plotter import make_fit_plot, make_bb_plot
+import nllfitter.future_fitter as ff
+from ROOT import gRandom
+from ROOT import TF1
 
 
 def bg_pdf(x, a, xlow=100, xhigh=180, doROOT=False):
@@ -101,62 +94,52 @@ bg_sig_fitter = ff.NLLFitter(bg_sig_model, data_bg_sig)
 bg_sig_result = bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
 
 # make MC
-bg_sig_pdf_ROOT = functools.partial(bg_sig_pdf, doROOT=True)
-tf1_bg_sig_pdf = TF1("tf1_bg_sig_pdf", bg_sig_pdf_ROOT, 100, 180, 6)
-tf1_bg_sig_pdf.SetParameters(*bg_sig_result.x)
-mc_bg_sig = []
-for i in xrange(len(data_bg_sig)):
-    mc_bg_sig.append(tf1_bg_sig_pdf.GetRandom())
+gRandom.SetSeed(111)
+# bg dist
+bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
+tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 100, 180, 3)
+tf1_bg_pdf.SetParameters(*bg_result.x)
+# signal dist
+sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
+tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 100, 180, 2)
+tf1_sig_pdf.SetParameters(*sig_result.x)
+mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(len(data_bg))]
+mc_sig = [tf1_sig_pdf.GetRandom() for i in xrange(len(data_sig))]
+mc_bg_sig = mc_bg+mc_sig
 mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(mc_bg_sig))
 mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
 
 # plot some outputs
 
-plt.figure()
-plt.hist(data_bg, nbins, range=xlimits, alpha=0.2, histtype='stepfilled')
-plt.plot(x, (len(data_bg)*binning)*bg_pdf(x, bg_result.x), linewidth=2)
-plt.xlabel('M (GeV)')
-plt.ylabel('Count')
-plt.title('Background-only distribution')
-
-plt.figure()
-plt.hist(data_sig, nbins, range=xlimits, alpha=0.2, histtype='stepfilled')
-plt.plot(x, (len(data_sig)*binning)*sig_pdf(x, sig_result.x), linewidth=2)
-plt.xlabel('M (GeV)')
-plt.ylabel('Count')
-plt.title('Signal-only distribution')
-
-plt.figure()
-plt.hist(data_bg_sig, nbins, range=xlimits, alpha=0.2, histtype='stepfilled')
-plt.plot(x, (len(data_bg_sig)*binning)*bg_sig_pdf(x, bg_sig_result.x), linewidth=2)
-plt.xlabel('M (GeV)')
-plt.ylabel('Count')
-plt.title('Signal+Background distribution')
-
-plt.figure()
-plt.hist(mc_bg_sig, nbins, range=xlimits, alpha=0.2, histtype='stepfilled')
-plt.plot(x, (len(mc_bg_sig)*binning)*bg_sig_pdf(x, mc_bg_sig_result.x), linewidth=2)
-plt.xlabel('M (GeV)')
-plt.ylabel('Count')
-plt.title('Signal+Background MC Toy')
-
-make_bb_plot(data_bg_sig, 0.02, bb_dir+'/plots/', title=r'pp$\to\gamma\gamma$ Sim',
+make_fit_plot(data_bg, 80, xlimits, functools.partial(bg_pdf, a=bg_result.x), 'Background distribution')
+make_fit_plot(data_sig, 80, xlimits, functools.partial(sig_pdf, a=sig_result.x), 'Signal distribution')
+make_fit_plot(data_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=bg_sig_result.x), 'Signal+Background distribution',
+              extra_pdf_tuple=(functools.partial(bg_sig_pdf, a=np.concatenate([[0], bg_sig_result.x[1:]])), 1-bg_sig_result.x[0], 'bg pdf'))
+make_fit_plot(mc_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=mc_bg_sig_result.x), 'Signal+Background MC Toy',
+              extra_pdf_tuple=(functools.partial(bg_sig_pdf, a=np.concatenate([[0], mc_bg_sig_result.x[1:]])), 1-mc_bg_sig_result.x[0], 'bg pdf'))
+make_bb_plot(data_bg_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
              xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_inject_hist')
-
-# Plots!!!
-# print 'Making plot of fit results.'
-# fit_plot(scale_data(data, invert=True), xlimits, None, None, bg_pdf, bg_result.x, 'test')
-# fit_plot(data, xlimits, None, None, bg_pdf, bg_result.x, 'test')
-
-# make_bb_plot(hgg_bg_sm_range, 0.02, bb_dir+'/plots/',title=r'pp$\to\gamma\gamma$ Sim',
-# xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='A.U.',save_name='hgg_bg_hist')
-# make_bb_plot(hgg_signal_selection, 0.02, bb_dir+'/plots/',title=r'pp$\to\gamma\gamma$ Sim',
-# xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='A.U.',save_name='hgg_signal_hist')
-# edges = make_bb_plot(pd.concat([hgg_bg_sm_range,hgg_signal_selection],ignore_index=True),
-# 0.02, bb_dir+'/plots/',title=r'pp$\to\gamma\gamma$ Sim', xlabel=r'$m_{\gamma\gamma}$ (GeV)',
-# ylabel='P/bin',save_name='hgg_inject_hist')
-# make_bb_plot(pd.concat([hgg_bg_sm_range,hgg_signal_selection],ignore_index=True),
-# 0.02, bb_dir+'/plots/',title=r'pp$\to\gamma\gamma$ Sim', xlabel=r'$m_{\gamma\gamma}$ (GeV)',
-# ylabel='A.U.',save_name='hgg_inject_hist',)
-# plt.show()
 plt.show()
+
+# run bb on many MC toys
+
+bg_bc = {}
+bg_be = {}
+bg_sig_bc = {}
+bg_sig_be = {}
+for toy in range(100):
+    print 'toy', toy
+    mc_bg                                = [tf1_bg_pdf.GetRandom() for i in xrange(len(data_bg))]
+    mc_sig                               = [tf1_sig_pdf.GetRandom() for i in xrange(len(data_sig))]
+    mc_bg_sig                            = mc_bg+mc_sig
+    bg_bin_content, bg_bin_edges         = np.histogram(mc_bg, bayesian_blocks(mc_bg, p0=0.02), density=True)
+    bg_sig_bin_content, bg_sig_bin_edges = np.histogram(mc_bg_sig, bayesian_blocks(mc_bg_sig, p0=0.02), density=True)
+    bg_bc['toy'+str(toy)]                = bg_bin_content
+    bg_be['toy'+str(toy)]                = bg_bin_edges
+    bg_sig_bc['toy'+str(toy)]            = bg_sig_bin_content
+    bg_sig_be['toy'+str(toy)]            = bg_sig_bin_edges
+
+# do stuff with these bcs and bes
+
+plt.figure()
+plt.hist()
