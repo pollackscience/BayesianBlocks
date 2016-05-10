@@ -3,10 +3,11 @@
 from __future__ import division
 import os
 import functools
+import bisect
 import numpy as np
 import cPickle as pkl
 from matplotlib import pyplot as plt
-from bb.tools.bayesian_blocks_modified import bayesian_blocks
+# from bb.tools.bayesian_blocks_modified import bayesian_blocks
 from bb.tools.bb_plotter import make_fit_plot, make_bb_plot
 import nllfitter.future_fitter as ff
 from ROOT import gRandom
@@ -52,6 +53,139 @@ def bg_sig_pdf(x, a, xlow=100, xhigh=180, doROOT=False):
     c = [a[1], a[2]]        # this is a ROOT-compatible hack
     return (1 - a[0])*bg_pdf(x, b, xlow=xlow, xhigh=xhigh) + a[0]*sig_pdf(x, c)
 
+def find_le(a, x):
+    '''Find rightmost value less than or equal to x'''
+    i = bisect.bisect_right(a, x)
+    if i:
+        return i-1,a[i-1]
+    raise ValueError
+
+def find_lt(a, x):
+    '''Find rightmost value less than x'''
+    i = bisect.bisect_left(a, x)
+    if i:
+        return i-1,a[i-1]
+    raise ValueError
+
+def find_ge(a, x):
+    '''Find leftmost item greater than or equal to x'''
+    i = bisect.bisect_left(a, x)
+    if i != len(a):
+        return i,a[i]
+    raise ValueError
+
+def find_gt(a, x):
+    '''Find leftmost value greater than x'''
+    i = bisect.bisect_right(a, x)
+    if i != len(a):
+        return i,a[i]
+    raise ValueError
+
+def get_mismatch_metric(bc_nominal, be_nominal, bc_test, be_test):
+    '''Calculate the total mismatch between two binning schemes.
+    Pass bin content and bin edges of the two histograms for comparison'''
+    metric = 0
+    for i in range(len(be_test)-1):
+        low_edge_test         = be_test[i]
+        hi_edge_test          = be_test[i+1]
+        ni1, low_nom_low_test = find_le(be_nominal, low_edge_test)
+        hi_nom_low_test       = find_gt(be_nominal, low_edge_test)[1]
+        ni2, low_nom_hi_test  = find_lt(be_nominal, hi_edge_test)
+        hi_nom_hi_test        = find_ge(be_nominal, hi_edge_test)[1]
+        bc_nom_1              = bc_nominal[ni1]
+        try:
+            bc_nom_2 = bc_nominal[ni2]
+        except:
+            bc_nom_2 = -1
+
+        if low_edge_test == low_nom_low_test and hi_edge_test == hi_nom_hi_test:
+            # low and high edges for nominal and test match, ignore them and go to next bin
+            continue
+        elif low_nom_low_test == low_nom_hi_test and hi_nom_low_test == hi_nom_hi_test:
+            # test bin completely contained in nominal bin (easy case)
+            metric += abs(bc_nom_1 - bc_test[i])
+        else:
+            # test bin overlaps two bg bins (harder case)
+            width_test = hi_edge_test - low_edge_test
+            low_width_test = hi_nom_low_test - low_edge_test
+            hi_width_test = hi_edge_test - hi_nom_low_test
+            metric += abs(bc_nom_1-bc_test[i])*(low_width_test/width_test)
+            metric += abs(bc_nom_2-bc_test[i])*(hi_width_test/width_test)
+    return metric
+
+def get_mismatch_metric_v2(bc_nominal, be_nominal, bc_test, be_test, main_edge):
+    '''Calculate the total mismatch between two binning schemes.
+    Pass bin content and bin edges of the two histograms for comparison'''
+    metric = 0
+    for i in range(len(be_test)-1):
+        low_edge_test         = be_test[i]
+        hi_edge_test          = be_test[i+1]
+        ni1, low_nom_low_test = find_le(be_nominal, low_edge_test)
+        hi_nom_low_test       = find_gt(be_nominal, low_edge_test)[1]
+        ni2, low_nom_hi_test  = find_lt(be_nominal, hi_edge_test)
+        hi_nom_hi_test        = find_ge(be_nominal, hi_edge_test)[1]
+        bc_nom_1              = bc_nominal[ni1]
+        try:
+            bc_nom_2 = bc_nominal[ni2]
+        except:
+            bc_nom_2 = -1
+
+        if low_edge_test == low_nom_low_test and hi_edge_test == hi_nom_hi_test:
+            # low and high edges for nominal and test match, ignore them and go to next bin
+            continue
+        elif low_nom_low_test == low_nom_hi_test and hi_nom_low_test == hi_nom_hi_test:
+            # test bin completely contained in nominal bin (easy case)
+            if low_edge_test == main_edge:
+                metric += 2*(bc_test[i]-bc_nom_1)
+            else:
+                metric += abs(bc_nom_1 - bc_test[i])
+        else:
+            # test bin overlaps two bg bins (harder case)
+            width_test = hi_edge_test - low_edge_test
+            low_width_test = hi_nom_low_test - low_edge_test
+            hi_width_test = hi_edge_test - hi_nom_low_test
+            if low_edge_test == main_edge:
+                metric += 2*(bc_test[i]-bc_nom_1)*(low_width_test/width_test)
+                metric += 2*(bc_test[i]-bc_nom_2)*(hi_width_test/width_test)
+            else:
+                metric += abs(bc_nom_1-bc_test[i])*(low_width_test/width_test)
+                metric += abs(bc_nom_2-bc_test[i])*(hi_width_test/width_test)
+    return metric
+
+def get_mismatch_metric_v3(bc_nominal, be_nominal, bc_test, be_test, main_edge):
+    '''Calculate the total mismatch between two binning schemes.
+    Pass bin content and bin edges of the two histograms for comparison'''
+    metric = 0
+    for i in range(len(be_test)-1):
+        low_edge_test         = be_test[i]
+        hi_edge_test          = be_test[i+1]
+        ni1, low_nom_low_test = find_le(be_nominal, low_edge_test)
+        hi_nom_low_test       = find_gt(be_nominal, low_edge_test)[1]
+        ni2, low_nom_hi_test  = find_lt(be_nominal, hi_edge_test)
+        hi_nom_hi_test        = find_ge(be_nominal, hi_edge_test)[1]
+        bc_nom_1              = bc_nominal[ni1]
+        try:
+            bc_nom_2 = bc_nominal[ni2]
+        except:
+            bc_nom_2 = -1
+
+        if low_edge_test == low_nom_low_test and hi_edge_test == hi_nom_hi_test:
+            # low and high edges for nominal and test match, ignore them and go to next bin
+            continue
+        elif low_nom_low_test == low_nom_hi_test and hi_nom_low_test == hi_nom_hi_test:
+            # test bin completely contained in nominal bin (easy case)
+            if low_edge_test == main_edge:
+                metric += 2*(bc_test[i]-bc_nom_1)
+        else:
+            # test bin overlaps two bg bins (harder case)
+            width_test = hi_edge_test - low_edge_test
+            low_width_test = hi_nom_low_test - low_edge_test
+            hi_width_test = hi_edge_test - hi_nom_low_test
+            if low_edge_test == main_edge:
+                metric += 2*(bc_test[i]-bc_nom_1)*(low_width_test/width_test)
+                metric += 2*(bc_test[i]-bc_nom_2)*(hi_width_test/width_test)
+    return metric
+
 
 plt.close('all')
 current_dir = os.path.dirname(__file__)
@@ -64,7 +198,7 @@ n_sigma              = 5
 hgg_bg_selection     = hgg_bg[(hgg_bg.Mgg > 100) & (hgg_bg.Mgg < 180)][0:10000].Mgg
 n_bg_under_sig       = hgg_bg_selection[(118 < hgg_bg_selection) & (hgg_bg_selection < 133)].size
 n_sig                = int(n_sigma*np.sqrt(n_bg_under_sig))
-hgg_signal_selection = hgg_signal[(hgg_signal.Mgg >= 100) & (hgg_signal.Mgg <= 180)][0:n_sig].Mgg
+hgg_signal_selection = hgg_signal[(hgg_signal.Mgg >= 118) & (hgg_signal.Mgg <= 133)][0:n_sig].Mgg
 data_bg              = hgg_bg_selection.values
 data_sig             = hgg_signal_selection.values
 data_bg_sig          = np.concatenate((data_bg, data_sig))
@@ -111,35 +245,45 @@ mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
 
 # plot some outputs
 
-make_fit_plot(data_bg, 80, xlimits, functools.partial(bg_pdf, a=bg_result.x), 'Background distribution')
-make_fit_plot(data_sig, 80, xlimits, functools.partial(sig_pdf, a=sig_result.x), 'Signal distribution')
-make_fit_plot(data_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=bg_sig_result.x), 'Signal+Background distribution',
-              extra_pdf_tuple=(functools.partial(bg_sig_pdf, a=np.concatenate([[0], bg_sig_result.x[1:]])), 1-bg_sig_result.x[0], 'bg pdf'))
-make_fit_plot(mc_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=mc_bg_sig_result.x), 'Signal+Background MC Toy',
-              extra_pdf_tuple=(functools.partial(bg_sig_pdf, a=np.concatenate([[0], mc_bg_sig_result.x[1:]])), 1-mc_bg_sig_result.x[0], 'bg pdf'))
+make_fit_plot(data_bg, 80, xlimits, functools.partial(bg_pdf, a=bg_result.x),
+        'Background distribution')
+make_fit_plot(data_sig, 80, xlimits, functools.partial(sig_pdf, a=sig_result.x),
+        'Signal distribution')
+make_fit_plot(data_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=bg_sig_result.x),
+        'Signal+Background distribution', extra_pdf_tuple=(functools.partial(bg_sig_pdf,
+            a=np.concatenate([[0], bg_sig_result.x[1:]])), 1-bg_sig_result.x[0], 'bg pdf'))
+make_fit_plot(mc_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=mc_bg_sig_result.x),
+        'Signal+Background MC Toy', extra_pdf_tuple=(functools.partial(bg_sig_pdf,
+            a=np.concatenate([[0], mc_bg_sig_result.x[1:]])), 1-mc_bg_sig_result.x[0], 'bg pdf'))
 make_bb_plot(data_bg_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
              xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_inject_hist')
-plt.show()
+bc_bg, be_bg = make_bb_plot(data_bg, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+             xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_bg_hist')
+bc_sig, be_sig = make_bb_plot(data_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+        xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_sig_hist')
+
+
+#plt.show()
+
+# convert be_sig to widths:
+
 
 # run bb on many MC toys
 
-bg_bc = {}
-bg_be = {}
-bg_sig_bc = {}
-bg_sig_be = {}
-for toy in range(100):
-    print 'toy', toy
-    mc_bg                                = [tf1_bg_pdf.GetRandom() for i in xrange(len(data_bg))]
-    mc_sig                               = [tf1_sig_pdf.GetRandom() for i in xrange(len(data_sig))]
-    mc_bg_sig                            = mc_bg+mc_sig
-    bg_bin_content, bg_bin_edges         = np.histogram(mc_bg, bayesian_blocks(mc_bg, p0=0.02), density=True)
-    bg_sig_bin_content, bg_sig_bin_edges = np.histogram(mc_bg_sig, bayesian_blocks(mc_bg_sig, p0=0.02), density=True)
-    bg_bc['toy'+str(toy)]                = bg_bin_content
-    bg_be['toy'+str(toy)]                = bg_bin_edges
-    bg_sig_bc['toy'+str(toy)]            = bg_sig_bin_content
-    bg_sig_be['toy'+str(toy)]            = bg_sig_bin_edges
+#bg_bc = {}
+#bg_be = {}
+#bg_sig_bc = {}
+#bg_sig_be = {}
+#for toy in range(100):
+#    print 'toy', toy
+#    mc_bg                                = [tf1_bg_pdf.GetRandom() for i in xrange(len(data_bg))]
+#    mc_sig                               = [tf1_sig_pdf.GetRandom() for i in xrange(len(data_sig))]
+#    mc_bg_sig                            = mc_bg+mc_sig
+#    bg_bin_content, bg_bin_edges         = np.histogram(mc_bg, bayesian_blocks(mc_bg, p0=0.02), density=True)
+#    bg_sig_bin_content, bg_sig_bin_edges = np.histogram(mc_bg_sig, bayesian_blocks(mc_bg_sig, p0=0.02), density=True)
+#    bg_bc['toy'+str(toy)]                = bg_bin_content
+#    bg_be['toy'+str(toy)]                = bg_bin_edges
+#    bg_sig_bc['toy'+str(toy)]            = bg_sig_bin_content
+#    bg_sig_be['toy'+str(toy)]            = bg_sig_bin_edges
 
 # do stuff with these bcs and bes
-
-plt.figure()
-plt.hist()
