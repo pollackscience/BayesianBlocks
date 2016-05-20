@@ -1,6 +1,8 @@
+from __future__ import division
 import warnings
-
+from numbers import Number
 import numpy as np
+import matplotlib
 
 from astroML.density_estimation import\
     scotts_bin_width, freedman_bin_width,\
@@ -11,7 +13,7 @@ from bayesian_blocks_modified import bayesian_blocks
 from fill_between_steps import fill_between_steps
 
 
-def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *args, **kwargs):
+def hist(x, bins=10, range=None, fitness='events', gamma = None, p0=0.05, *args, **kwargs):
     """Enhanced histogram
 
     This is a histogram function that enables the use of more sophisticated
@@ -45,11 +47,6 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
     if isinstance(bins, str) and "weights" in kwargs:
         warnings.warn("weights argument is not supported: it will be ignored.")
         kwargs.pop('weights')
-        weights = None
-    elif "weights" in kwargs:
-        weights = kwargs['weights']
-    else:
-        weights = None
 
     x = np.asarray(x)
 
@@ -84,26 +81,43 @@ def hist(x, bins=10, range=None, fitness='poly_events', gamma = None, p0=0.05, *
         kwargs.pop('scale')
     elif 'scale' in kwargs:
         scale = kwargs.pop('scale')
-        if 'normed' in kwargs:
-            normed = kwargs.pop('normed')
-        else:
-            normed = False
-        bin_content, bins = np.histogram(x,bins,range,weights=weights,density=normed)
-        #return fill_between_steps(ax, bins, bin_content*scale,0, step_where='pre', **kwargs)
-        width = bins[1:]-bins[:-1]
-        if 'histtype' in kwargs:
-            histtype = kwargs.pop('histtype')
-            if histtype=='bar':
-                pass
-            elif histtype=='stepfilled':
-                kwargs['linewidth']=0
-        else: histtype='bar'
+        bin_content, bins, patches = ax.hist(x, bins, range, **kwargs)
+        if isinstance(patches[0], matplotlib.patches.Rectangle):
+            if scale == 'binwidth':
+                for i, bc in enumerate(bin_content):
+                    width = (bins[i+1]-bins[i])
+                    bin_content[i] /= width
+                    plt.setp(patches[i], 'height', patches[i].get_height()/width)
+            elif isinstance(scale, Number):
+                for i, bc in enumerate(bin_content):
+                    bin_content[i] *= scale
+                    plt.setp(patches[i], 'height', patches[i].get_height()*scale)
+            else:
+                warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
 
-        if histtype=='step':
-            ax.step(bins[0:2], bin_content[0:2]*scale, where='post', **kwargs)
-            kwargs['label']=None
-            return ax.step(bins[1:], bin_content*scale, where='pre', **kwargs)
-        else:
-            return ax.bar(bins[:-1],bin_content*scale,width,**kwargs)
+        elif isinstance(patches[0], matplotlib.patches.Polygon):
+            xy = patches[0].get_xy()
+            j = 0
+            if scale == 'binwidth':
+                for i, bc in enumerate(bin_content):
+                    width = (bins[i+1]-bins[i])
+                    bin_content[i] /= width
+                    xy[j+1,1] = bin_content[i]
+                    xy[j+2,1] = bin_content[i]
+                    j+=2
+                    #plt.setp(patches[i], 'height', patches[i].get_height()/width)
+            elif isinstance(scale, Number):
+                for i, bc in enumerate(bin_content):
+                    bin_content[i] *= scale
+                    xy[j+1,1] = bin_content[i]
+                    xy[j+2,1] = bin_content[i]
+                    j+=2
+            else:
+                warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
+            plt.setp(patches[0], 'xy', xy)
+
+        ax.relim()
+        ax.autoscale_view(False,False,True)
+        return bin_content, bins, patches
 
     return ax.hist(x, bins, range, **kwargs)

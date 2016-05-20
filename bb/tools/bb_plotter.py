@@ -201,7 +201,8 @@ def make_comp_plots(data, p0, save_dir,title='Plot of thing vs thing', xlabel='X
     #plot_html = new_iplot(fig,show_link=False)
     #plot(fig,filename = save_dir+save_name+'.html')
 
-def make_bb_plot(data, p0, save_dir, range=None,title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot', overlay_reg_bins = True, edges=None,scale=None):
+def make_bb_plot(data, p0, save_dir, range=None,title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot', overlay_reg_bins = True, edges=None,scale=None, bins=80):
+
     if edges != None:
         bb_edges=edges
     else:
@@ -210,7 +211,7 @@ def make_bb_plot(data, p0, save_dir, range=None,title='Plot of thing vs thing', 
     #bin_content = np.histogram(data,bb_edges,density=True)[0]
     #plt.yscale('log', nonposy='clip')
 
-    hist(data,bins=80,range=range,histtype='stepfilled',alpha=0.2,label='100 bins',normed=True,scale=scale)
+    hist(data,bins=bins,range=range,histtype='stepfilled',alpha=0.2,label='{} bins'.format(bins),normed=True,scale=scale)
     #hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=False)
     bb_content, bb_edges,_ = hist(data,bins=bb_edges,range=range,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=True,scale=scale)
     #fill_between_steps(plt.gca(), bb_edges, bin_content*len(data),bin_content*len(data)/2, alpha=0.5, step_where='pre',linewidth=2,label='norm attempt')

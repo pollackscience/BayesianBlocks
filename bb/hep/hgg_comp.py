@@ -257,9 +257,9 @@ make_fit_plot(mc_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=mc_bg_sig_
             a=np.concatenate([[0], mc_bg_sig_result.x[1:]])), 1-mc_bg_sig_result.x[0], 'bg pdf'))
 make_bb_plot(data_bg_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
              xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_inject_hist')
-bc_bg, be_bg = make_bb_plot(data_bg, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+make_bb_plot(data_bg, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
              xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_bg_hist')
-bc_sig, be_sig = make_bb_plot(data_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+make_bb_plot(data_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
         xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_sig_hist')
 
 

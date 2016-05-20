@@ -389,7 +389,7 @@ def bayesian_blocks(t, x=None, sigma=None,
         fitfunc = fitness
 
     # find unique values of t
-    t = np.array(t, dtype=float)
+    t = np.array(t, dtype=np.float64)
     assert t.ndim == 1
     unq_t, unq_ind, unq_inv = np.unique(t, return_index=True,
                                         return_inverse=True)
