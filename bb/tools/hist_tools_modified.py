@@ -82,15 +82,18 @@ def hist(x, bins=10, range=None, fitness='events', gamma = None, p0=0.05, *args,
     elif 'scale' in kwargs:
         scale = kwargs.pop('scale')
         bin_content, bins, patches = ax.hist(x, bins, range, **kwargs)
+        bin_error = np.sqrt(bin_content)
         if isinstance(patches[0], matplotlib.patches.Rectangle):
             if scale == 'binwidth':
                 for i, bc in enumerate(bin_content):
                     width = (bins[i+1]-bins[i])
                     bin_content[i] /= width
+                    bin_error[i] /=width
                     plt.setp(patches[i], 'height', patches[i].get_height()/width)
             elif isinstance(scale, Number):
                 for i, bc in enumerate(bin_content):
                     bin_content[i] *= scale
+                    bin_error[i] *= scale
                     plt.setp(patches[i], 'height', patches[i].get_height()*scale)
             else:
                 warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
@@ -102,6 +105,7 @@ def hist(x, bins=10, range=None, fitness='events', gamma = None, p0=0.05, *args,
                 for i, bc in enumerate(bin_content):
                     width = (bins[i+1]-bins[i])
                     bin_content[i] /= width
+                    bin_error[i] /= width
                     xy[j+1,1] = bin_content[i]
                     xy[j+2,1] = bin_content[i]
                     j+=2
@@ -109,6 +113,7 @@ def hist(x, bins=10, range=None, fitness='events', gamma = None, p0=0.05, *args,
             elif isinstance(scale, Number):
                 for i, bc in enumerate(bin_content):
                     bin_content[i] *= scale
+                    bin_error[i] *= scale
                     xy[j+1,1] = bin_content[i]
                     xy[j+2,1] = bin_content[i]
                     j+=2

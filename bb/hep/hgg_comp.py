@@ -5,6 +5,8 @@ import os
 import functools
 import bisect
 import numpy as np
+from scipy.stats import norm
+import scipy.integrate as integrate
 import cPickle as pkl
 from matplotlib import pyplot as plt
 # from bb.tools.bayesian_blocks_modified import bayesian_blocks
@@ -187,83 +189,114 @@ def get_mismatch_metric_v3(bc_nominal, be_nominal, bc_test, be_test, main_edge):
     return metric
 
 
-plt.close('all')
-current_dir = os.path.dirname(__file__)
-bb_dir      = os.path.join(current_dir, '../..')
-hgg_bg      = pkl.load(open(bb_dir+'/files/hgg_bg.p', "rb"))
-hgg_signal  = pkl.load(open(bb_dir+'/files/hgg_signal.p', "rb"))
+def calc_local_pvalue(N_bg, var_bg, N_sig, var_sig, ntoys=1e7):
+    print ''
+    print 'Calculating local p-value and significance based on {0} toys'.format(ntoys)
+    print 'N_bg = {0}, sigma_bg = {1}, N_signal = {2}'.format(N_bg,var_bg,N_sig)
+    toys    = np.random.normal(N_bg, var_bg, int(ntoys))
+    #print toys
+    pvars   = np.random.poisson(toys)
+    pval    = pvars[pvars > N_bg + N_sig].size/ntoys
+    print 'local p-value = {0}'.format(pval)
+    print 'local significance = {0:.2f}'.format(np.abs(norm.ppf(1-pval)))
+
+
+if __name__ == "__main__":
+    plt.close('all')
+    current_dir = os.path.dirname(__file__)
+    bb_dir      = os.path.join(current_dir, '../..')
+    hgg_bg      = pkl.load(open(bb_dir+'/files/hgg_bg.p', "rb"))
+    hgg_signal  = pkl.load(open(bb_dir+'/files/hgg_signal.p', "rb"))
 
 # grab a handful of bg events, and an ~X sigma number of signal events
-n_sigma              = 5
-hgg_bg_selection     = hgg_bg[(hgg_bg.Mgg > 100) & (hgg_bg.Mgg < 180)][0:10000].Mgg
-n_bg_under_sig       = hgg_bg_selection[(118 < hgg_bg_selection) & (hgg_bg_selection < 133)].size
-n_sig                = int(n_sigma*np.sqrt(n_bg_under_sig))
-hgg_signal_selection = hgg_signal[(hgg_signal.Mgg >= 118) & (hgg_signal.Mgg <= 133)][0:n_sig].Mgg
-data_bg              = hgg_bg_selection.values
-data_sig             = hgg_signal_selection.values
-data_bg_sig          = np.concatenate((data_bg, data_sig))
+    n_sigma              = 5
+    hgg_bg_selection     = hgg_bg[(hgg_bg.Mgg > 100) & (hgg_bg.Mgg < 180)][0:10000].Mgg
+    n_bg_under_sig       = hgg_bg_selection[(118 < hgg_bg_selection) & (hgg_bg_selection < 133)].size
+    n_sig                = int(n_sigma*np.sqrt(n_bg_under_sig))
+    hgg_signal_selection = hgg_signal[(hgg_signal.Mgg >= 118) & (hgg_signal.Mgg <= 133)][0:n_sig].Mgg
+    data_bg              = hgg_bg_selection.values
+    data_sig             = hgg_signal_selection.values
+    data_bg_sig          = np.concatenate((data_bg, data_sig))
 
-print 'loaded'
+    print 'loaded'
 
 # setup initial ranges and binning
-xlimits = (100., 180.)
-x       = np.linspace(xlimits[0], xlimits[1], 10000)
-nbins   = 80
-binning = (xlimits[1]-xlimits[0])/nbins
+    xlimits = (100., 180.)
+    x       = np.linspace(xlimits[0], xlimits[1], 10000)
+    nbins   = 80
+    binning = (xlimits[1]-xlimits[0])/nbins
 
 # fit to the data distributions
-bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
-bg_fitter = ff.NLLFitter(bg_model, data_bg)
-bg_result = bg_fitter.fit([0.0, 0.0, 0.0])
+    bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
+    bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+    bg_fitter = ff.NLLFitter(bg_model, data_bg)
+    bg_result = bg_fitter.fit([0.0, 0.0, 0.0])
 
-sig_model = ff.Model(sig_pdf, ['mu', 'sigma'])
-sig_model.set_bounds([(110, 130), (1, 5)])
-sig_fitter = ff.NLLFitter(sig_model, data_sig)
-sig_result = sig_fitter.fit([120.0, 2])
+    sig_model = ff.Model(sig_pdf, ['mu', 'sigma'])
+    sig_model.set_bounds([(110, 130), (1, 5)])
+    sig_fitter = ff.NLLFitter(sig_model, data_sig)
+    sig_result = sig_fitter.fit([120.0, 2])
 
-bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
-bg_sig_model.set_bounds([(0, 1), (xlimits[0], xlimits[1]), (0, 50), (-1., 1.), (-1., 1.), (-1., 1.)])
-bg_sig_fitter = ff.NLLFitter(bg_sig_model, data_bg_sig)
-bg_sig_result = bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
+    bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
+    bg_sig_model.set_bounds([(0, 1), (xlimits[0], xlimits[1]), (0, 50), (-1., 1.), (-1., 1.), (-1., 1.)])
+    bg_sig_fitter = ff.NLLFitter(bg_sig_model, data_bg_sig)
+    bg_sig_result = bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
 
 # make MC
-gRandom.SetSeed(111)
+    gRandom.SetSeed(111)
 # bg dist
-bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
-tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 100, 180, 3)
-tf1_bg_pdf.SetParameters(*bg_result.x)
+    bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
+    tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 100, 180, 3)
+    tf1_bg_pdf.SetParameters(*bg_result.x)
 # signal dist
-sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
-tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 100, 180, 2)
-tf1_sig_pdf.SetParameters(*sig_result.x)
-mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(len(data_bg))]
-mc_sig = [tf1_sig_pdf.GetRandom() for i in xrange(len(data_sig))]
-mc_bg_sig = mc_bg+mc_sig
-mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(mc_bg_sig))
-mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
+    sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
+    tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 100, 180, 2)
+    tf1_sig_pdf.SetParameters(*sig_result.x)
+    mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(len(data_bg))]
+    mc_sig = [tf1_sig_pdf.GetRandom() for i in xrange(len(data_sig))]
+    mc_bg_sig = mc_bg+mc_sig
+    mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(mc_bg_sig))
+    mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0])
+    mc_bg_bad_fitter = ff.NLLFitter(bg_model, np.asarray(mc_bg_sig))
+    mc_bg_bad_result = mc_bg_bad_fitter.fit([ 0.0, 0.0, 0.0])
+
+    n_bg_calc, _  = integrate.quad(functools.partial(bg_sig_pdf, a=np.concatenate([[0], mc_bg_sig_result.x[1:]])),
+            mc_bg_sig_result.x[1]-mc_bg_sig_result.x[2]*2, mc_bg_sig_result.x[1]+mc_bg_sig_result.x[2]*2)
+    n_bg_calc *= len(mc_bg_sig)*(1-mc_bg_sig_result.x[0])
+    mc_bg_sig_result.x[1]-mc_bg_sig_result.x[2]*2, mc_bg_sig_result.x[1]+mc_bg_sig_result.x[2]*2
+    n_sig_calc = len(mc_bg_sig)*mc_bg_sig_result.x[0]
+    n_sig_std = mc_bg_sig_fitter.get_corr(mc_bg_sig_result.x)[0][0]
+    print n_sig_calc, n_sig_std*len(mc_bg_sig), n_bg_calc, np.sqrt(n_bg_calc)
+    calc_local_pvalue(n_bg_calc, np.sqrt(n_bg_calc), n_sig, n_sig_std*len(mc_bg_sig),1e7)
+
 
 # plot some outputs
 
-make_fit_plot(data_bg, 80, xlimits, functools.partial(bg_pdf, a=bg_result.x),
-        'Background distribution')
-make_fit_plot(data_sig, 80, xlimits, functools.partial(sig_pdf, a=sig_result.x),
-        'Signal distribution')
-make_fit_plot(data_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=bg_sig_result.x),
-        'Signal+Background distribution', extra_pdf_tuple=(functools.partial(bg_sig_pdf,
-            a=np.concatenate([[0], bg_sig_result.x[1:]])), 1-bg_sig_result.x[0], 'bg pdf'))
-make_fit_plot(mc_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=mc_bg_sig_result.x),
-        'Signal+Background MC Toy', extra_pdf_tuple=(functools.partial(bg_sig_pdf,
-            a=np.concatenate([[0], mc_bg_sig_result.x[1:]])), 1-mc_bg_sig_result.x[0], 'bg pdf'))
-make_bb_plot(data_bg_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
-             xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_inject_hist')
-make_bb_plot(data_bg, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
-             xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_bg_hist')
-make_bb_plot(data_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
-        xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_sig_hist')
+#make_fit_plot(data_bg, 80, xlimits, functools.partial(bg_pdf, a=bg_result.x),
+#        'Background distribution')
+#make_fit_plot(data_sig, 80, xlimits, functools.partial(sig_pdf, a=sig_result.x),
+#        'Signal distribution')
+#make_fit_plot(data_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=bg_sig_result.x),
+#        'Signal+Background distribution', extra_pdf_tuple=(functools.partial(bg_sig_pdf,
+#            a=np.concatenate([[0], bg_sig_result.x[1:]])), 1-bg_sig_result.x[0], 'bg pdf'))
+    textstr = ('$C={0:.2f}$\n$\mu={1:.2f}$\n$\sigma={2:.2f}$\n'
+                '$a_1={3:.2f}$\n$a_2={4:.2f}$\n$a_3={5:.2f}$').format(*mc_bg_sig_result.x)
+    make_fit_plot(mc_bg_sig, 80, xlimits, functools.partial(bg_sig_pdf, a=mc_bg_sig_result.x),
+            'Signal+Background MC Toy', extra_pdf_tuple=(functools.partial(bg_sig_pdf,
+                a=np.concatenate([[0], mc_bg_sig_result.x[1:]])), 1-mc_bg_sig_result.x[0], 'bg pdf'), textstr = textstr)
+#make_bb_plot(data_bg_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+#             xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_inject_hist')
+#make_bb_plot(data_bg, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+#             xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_bg_hist')
+#make_bb_plot(data_sig, 0.02, bb_dir+'/plots/', range=xlimits, title=r'pp$\to\gamma\gamma$ Sim',
+#        xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_sig_hist')
+    bc_bg, be_bg = make_bb_plot(mc_bg, 0.02, bb_dir+'/plots/', range=xlimits, title='BB binning for Background Distribution',
+                   xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_bg_hist')
+    bc_sig, be_sig = make_bb_plot(mc_sig, 0.02, bb_dir+'/plots/', range=xlimits, title='BB binning for Signal Distribution',
+                     xlabel=r'$m_{\gamma\gamma}$ (GeV)', ylabel='P/bin', save_name='hgg_sig_hist')
 
 
-#plt.show()
+    plt.show()
 
 # convert be_sig to widths:
 
