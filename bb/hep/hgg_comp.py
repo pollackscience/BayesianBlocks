@@ -10,11 +10,17 @@ import scipy.integrate as integrate
 from scipy.stats import poisson
 import cPickle as pkl
 from matplotlib import pyplot as plt
+from lmfit import Model
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
 import nllfitter.future_fitter as ff
 from ROOT import gRandom
 from ROOT import TF1
 
+def lm_binned_wrapper(mu_bg, mu_sig):
+    def lm_binned(ix, A, ntot):
+        proper_means = ((mu_bg+A*mu_sig)/np.sum(mu_bg+A*mu_sig))*ntot
+        return proper_means[ix]
+    return lm_binned
 
 def bg_pdf(x, a, xlow=100, xhigh=180, doROOT=False):
     '''3rd order legendre poly, mapped from [-1,1] to [xlow,xhigh].
@@ -252,19 +258,20 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
     bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
 
     bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
-    bg_sig_model.set_bounds([(0, 1), (111, 179), (0.01, 10), (-1., 1.), (-1., 1.), (-1., 1.)])
+    bg_sig_model.set_bounds([(0, 1), ( 125.77,  125.77), (2.775, 2.775), (-1., 1.), (-1., 1.), (-1., 1.)])
+    #bg_sig_model.set_bounds([(0, 1), ( 125.77,  125.77), (2.775, 2.775), (-0.957, -0.957), (0.399, 0.399), (-0.126, -0.126)])
 
     if bg_params:
         bg_nll = bg_model.nll(np.asarray(data),bg_params)
     else:
         mc_bg_only_fitter = ff.NLLFitter(bg_model, np.asarray(data),verbose=False)
-        mc_bg_only_result = mc_bg_only_fitter.fit([ 0.0, 0.0, 0.0], calculate_corr = False)
+        mc_bg_only_result = mc_bg_only_fitter.fit([ -0.963, 0.366, -0.091], calculate_corr = False)
         bg_nll = mc_bg_only_result.fun
     if sig_params:
-        bg_sig_nll = bg_sig_model.nll(np.asarray(data),[0.02306,125.772,2.775,-0.957,0.399,-0.126])
+        bg_sig_nll = bg_sig_model.nll(np.asarray(data),sig_params)
     else:
         mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(data),verbose=False)
-        mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.0, 2, 0.0, 0.0, 0.0], calculate_corr = False)
+        mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.77, 2.775, -0.957, 0.399, -0.126], calculate_corr = False)
         bg_sig_nll = mc_bg_sig_result.fun
     q0 = 2*max(bg_nll-bg_sig_nll,0)
     return q0
@@ -285,6 +292,22 @@ def generate_q0_via_bins(data, bin_edges, true_bg_bc, true_sig_bc):
     q0 = -2*(np.log(l_bg)-np.log(l_sig))
     return q0
 
+def generate_q0_via_shape_fit(data, bin_edges, binned_model, binned_params):
+    '''Generate likelihood ratios based on a template fit to the data.
+    Shape values for bg and signal are determined from integration of
+    underlying pdfs used to generate toys.
+    Use these values to create the q0 statistic.'''
+
+    bc, bin_edges = np.histogram(data, bin_edges, range=(100,180))
+    ibc = np.asarray(range(len(bc)))
+    result = binned_model.fit(bc, ix = ibc, params = binned_params)
+    nll_bg = -np.sum(np.log(poisson.pmf(bc,result.eval(A=0))))
+    nll_sig = -np.sum(np.log(poisson.pmf(bc,result.best_fit)))
+
+    q0 = 2*(nll_bg-nll_sig)
+    return q0
+
+
 if __name__ == "__main__":
     plt.close('all')
     current_dir = os.path.dirname(__file__)
@@ -294,6 +317,7 @@ if __name__ == "__main__":
 
     bg_result, sig_result, n_bg, n_sig, be_bg, be_sig = generate_initial_params(hgg_bg, hgg_signal, 5)
     be_hybrid = np.concatenate([be_bg[be_bg<be_sig[0]-1.5], be_sig, be_bg[be_bg>be_sig[-1]+1.5]])
+
     be_1GeV = np.linspace(100,180,81)
     be_2GeV = np.linspace(100,180,41)
     be_5GeV = np.linspace(100,180,17)
@@ -306,6 +330,15 @@ if __name__ == "__main__":
 	true_bg_bc.append(true_bg*n_bg)
 	true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_result.x),be_hybrid[i],be_hybrid[i+1])
 	true_sig_bc.append(true_sig*n_sig)
+
+    lm_binned = lm_binned_wrapper(np.asarray(true_bg_bc), np.asarray(true_sig_bc))
+    binned_model = Model(lm_binned)
+    binned_params = binned_model.make_params()
+    binned_params['ntot'].value   = n_bg+n_sig
+    binned_params['ntot'].vary    = False
+    binned_params['A'].value      = 0.1
+    binned_params['A'].min        = 0
+    binned_params['A'].max        = 1000
 
     true_bg_bc_1GeV  = []
     true_sig_bc_1GeV = []
@@ -339,13 +372,14 @@ if __name__ == "__main__":
     signif_nll_fit_hist = []
     signif_nll_true_hist = []
     signif_bb_true_hist = []
+    signif_bb_shape_hist = []
     signif_1GeV_true_hist = []
     signif_2GeV_true_hist = []
     signif_5GeV_true_hist = []
     signif_10GeV_true_hist = []
 
     # Do a bunch of toys
-    gRandom.SetSeed(10)
+    gRandom.SetSeed(20)
 
     for i in range(500):
         if i%10==0: print 'doing fit #',i
@@ -353,15 +387,19 @@ if __name__ == "__main__":
         mc_bg_sig = mc_bg+mc_sig
 
         q0_nll_fit = generate_q0_via_nll_unbinned(mc_bg_sig)
+                #bg_params = [-0.957, 0.399, -0.126])
         signif_nll_fit_hist.append(np.sqrt(q0_nll_fit))
 
         q0_nll_true = generate_q0_via_nll_unbinned(mc_bg_sig,
-                bg_params = [-0.957,0.399,-0.126],
-                sig_params = [0.02306,125.772,2.775,-0.957,0.399,-0.126])
+                bg_params = [-0.957, 0.399, -0.126],
+                sig_params = [0.02306, 125.772, 2.775, -0.957, 0.399, -0.126])
         signif_nll_true_hist.append(np.sqrt(q0_nll_true))
 
         q0_bb_true = generate_q0_via_bins(mc_bg_sig, be_hybrid, true_bg_bc, true_sig_bc)
         signif_bb_true_hist.append(np.sqrt(q0_bb_true))
+
+        q0_bb_shape = generate_q0_via_shape_fit(mc_bg_sig, be_hybrid, binned_model, binned_params)
+        signif_bb_shape_hist.append(np.sqrt(q0_bb_shape))
 
         q0_1GeV_true = generate_q0_via_bins(mc_bg_sig, be_1GeV, true_bg_bc_1GeV, true_sig_bc_1GeV)
         signif_1GeV_true_hist.append(np.sqrt(q0_1GeV_true))
@@ -374,4 +412,3 @@ if __name__ == "__main__":
 
         q0_10GeV_true = generate_q0_via_bins(mc_bg_sig, be_10GeV, true_bg_bc_10GeV, true_sig_bc_10GeV)
         signif_10GeV_true_hist.append(np.sqrt(q0_10GeV_true))
-
