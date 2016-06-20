@@ -18,7 +18,6 @@ from plotly.offline import download_plotlyjs, init_notebook_mode, iplot, plot
 import plotly.graph_objs as go
 import plotly.plotly as py
 
-
 def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = None, bg_est='data_driven', signal=None, mode='no_signal'):
     bin_centres = (bin_edges[:-1] + bin_edges[1:])/2.
     fig = plt.figure()

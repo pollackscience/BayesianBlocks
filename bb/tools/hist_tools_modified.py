@@ -3,6 +3,7 @@ import warnings
 from numbers import Number
 import numpy as np
 import matplotlib
+from matplotlib import pyplot as plt
 
 from astroML.density_estimation import\
     scotts_bin_width, freedman_bin_width,\
@@ -10,7 +11,7 @@ from astroML.density_estimation import\
 
 #from bb_poly import bayesian_blocks
 from bayesian_blocks_modified import bayesian_blocks
-from fill_between_steps import fill_between_steps
+#from fill_between_steps import fill_between_steps
 
 
 def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, *args, **kwargs):
@@ -69,8 +70,6 @@ def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, 
     if 'ax' in kwargs:
         ax = kwargs.pop('ax')
     else:
-        # import here so that testing with Agg will work
-        from matplotlib import pyplot as plt
         ax = plt.gca()
 
     # if range is specified, we need to truncate the data for
@@ -121,6 +120,7 @@ def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, 
         else:
             linestyle = ''
         bin_content, bins = np.histogram(x, bins, density=normed)
+        bin_content = np.asarray(bin_content, dtype=float)
         width = (bins[1:]-bins[:-1])
         bin_centers = bins[:-1]+width*0.5
         bin_error = np.sqrt(bin_content)
@@ -131,6 +131,7 @@ def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, 
 
     else:
         bin_content, bins, vis_objects = ax.hist(x, bins, **kwargs)
+        bin_content = np.asarray(bin_content, dtype=float)
         bin_error = np.sqrt(bin_content)
 
 # perform any scaling if necessary, including redrawing of the scaled objects
