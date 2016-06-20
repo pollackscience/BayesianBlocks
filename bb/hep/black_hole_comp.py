@@ -13,11 +13,14 @@ from bb.tools.hist_tools_modified import hist
 import os
 
 plt.close('all')
-p0=0.005
+p0=0.001
 
 current_dir = os.path.dirname(__file__)
 bb_dir=os.path.join(current_dir,'../..')
-df_data = pkl.load(open(bb_dir+'/files/BHTree_data.p','rb'))
+df_data = pkl.load(open(bb_dir+'/files/BH/BH_paper_data.p','rb'))
 
-my_ST_data = df_data[df_data['ST_mul5'>2300]['ST_mul8'].values
+data_ST_mul8 = df_data.ST_mul8_BB.values
 
+bc,be,_ = hist(data_ST_mul8, p0=0.01, bins='blocks', scale='binwidth', log=True)
+
+plt.show()

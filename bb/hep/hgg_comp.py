@@ -12,6 +12,7 @@ import cPickle as pkl
 from matplotlib import pyplot as plt
 from lmfit import Model
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
+#from bb.tools.bb_plotter import make_fit_plot
 import nllfitter.future_fitter as ff
 from ROOT import gRandom
 from ROOT import TF1
@@ -258,7 +259,7 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
     bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
 
     bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
-    bg_sig_model.set_bounds([(0, 1), ( 125.77,  125.77), (2.775, 2.775), (-1., 1.), (-1., 1.), (-1., 1.)])
+    bg_sig_model.set_bounds([(0, 1), ( 120,  130), (1, 4), (-1., 1.), (-1., 1.), (-1., 1.)])
     #bg_sig_model.set_bounds([(0, 1), ( 125.77,  125.77), (2.775, 2.775), (-0.957, -0.957), (0.399, 0.399), (-0.126, -0.126)])
 
     if bg_params:
@@ -274,6 +275,32 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
         mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.77, 2.775, -0.957, 0.399, -0.126], calculate_corr = False)
         bg_sig_nll = mc_bg_sig_result.fun
     q0 = 2*max(bg_nll-bg_sig_nll,0)
+    return q0
+
+def generate_q0_via_nll_unbinned_constrained(bg,data):
+    '''Perform two nll fits to data, one for bg+signal, one for bg-only.
+    Use these values to create the q0 statistic.'''
+
+    data = np.asarray(data)
+    bg = np.asarray(bg)
+    bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
+    bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+
+    mc_bg_only_fitter = ff.NLLFitter(bg_model, bg ,verbose=False)
+    mc_bg_only_result = mc_bg_only_fitter.fit([ -0.963, 0.366, -0.091], calculate_corr = False)
+    bg_ps = mc_bg_only_result.x
+    bg_nll = bg_model.nll(data, bg_ps)
+
+    bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
+    bg_sig_model.set_bounds([(0, 1), ( 125.77,  125.77), (2.775, 2.775), (bg_ps[0], bg_ps[0]), (bg_ps[1], bg_ps[1]), (bg_ps[2], bg_ps[2])])
+
+    mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(data),verbose=False)
+    mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.77, 2.775, bg_ps[0], bg_ps[1], bg_ps[2]], calculate_corr = False)
+    bg_sig_nll = mc_bg_sig_result.fun
+    q0 = 2*max(bg_nll-bg_sig_nll,0)
+
+    #make_fit_plot(mc_bg_sig, 80, (100,180), functools.partial(bg_sig_pdf, a=mc_bg_sig_result.x),
+    #        'Signal+BG model to Signal+BG Toy', extra_pdf_tuple=(functools.partial(bg_pdf, a=bg_ps),1, 'bg pdf'))
     return q0
 
 def generate_q0_via_bins(data, bin_edges, true_bg_bc, true_sig_bc):
@@ -370,6 +397,7 @@ if __name__ == "__main__":
 	true_sig_bc_10GeV.append(true_sig*n_sig)
 
     signif_nll_fit_hist = []
+    signif_nll_constrained_hist = []
     signif_nll_true_hist = []
     signif_bb_true_hist = []
     signif_bb_shape_hist = []
@@ -389,6 +417,9 @@ if __name__ == "__main__":
         q0_nll_fit = generate_q0_via_nll_unbinned(mc_bg_sig)
                 #bg_params = [-0.957, 0.399, -0.126])
         signif_nll_fit_hist.append(np.sqrt(q0_nll_fit))
+
+        q0_nll_constrained = generate_q0_via_nll_unbinned_constrained(mc_bg, mc_bg_sig)
+        signif_nll_constrained_hist.append(np.sqrt(q0_nll_constrained))
 
         q0_nll_true = generate_q0_via_nll_unbinned(mc_bg_sig,
                 bg_params = [-0.957, 0.399, -0.126],

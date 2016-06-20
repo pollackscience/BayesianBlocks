@@ -9,6 +9,7 @@ import cPickle as pkl
 import scipy.stats as st
 import cPickle as pkl
 from bb.tools.bb_plotter import make_hist_ratio_blackhole
+from bb.tools.bb_plotter import make_hist_ratio_blackhole2
 
 def do_bh_analysis():
 
@@ -18,12 +19,13 @@ def do_bh_analysis():
     log = True
     STs = [2,3,4,5,6,7,8,9,10]
     ST_low = [2300,2300,2300,2600,2600,2600,2800,2800,2900]
+    ST_low = [2300]*9
     ST_low_dict = dict(zip(STs,ST_low))
     samples = 5000
     seed = 2
     p0=0.005
     bg_est = 'data_driven' #'data_driven','mc','low_ST'
-    mode = 'no_signal' #'no_signal','signal_search','signal_inj','signal_search_inj'
+    mode = 'signal_search' #'no_signal','signal_search','signal_inj','signal_search_inj'
 
     if mode not in ['no_signal','signal_search','signal_inj','signal_search_inj']: raise KeyError('mode is not allowed!')
     if bg_est not in ['data_driven','mc','low_ST']: raise KeyError('bg_est is not allowed!')
@@ -33,9 +35,9 @@ def do_bh_analysis():
     else:
         signal_num = 0
 
-    df_mc = pkl.load(open('../../files/BHTree_mc.p','rb'))
-    df_signal = pkl.load(open('../../files/BHTree_signal.p','rb'))
-    df_data = pkl.load(open('../../files/BHTree_data.p','rb'))
+    df_mc = pkl.load(open('../../files/BH/BHTree_mc.p','rb'))
+    df_signal = pkl.load(open('../../files/BH/BHTree_signal.p','rb'))
+    df_data = pkl.load(open('../../files/BH/BHTree_data.p','rb'))
 
     weights = df_mc.weightTree.unique()#[0.27436519,0.0401976,0.01657276]
     df_mc_list = []
@@ -43,8 +45,8 @@ def do_bh_analysis():
         df_mc_list.append(df_mc[np.isclose(df_mc.weightTree,weight)])
 
     all_edges = {}
-    for ST in range(2,11):
-    #for ST in [10]:
+    #for ST in range(2,11):
+    for ST in [8]:
         my_ST_data = df_data[df_data['ST_mul'+str(ST)]>ST_low_dict[ST]]['ST_mul'+str(ST)].values
         nentries = len(my_ST_data)
         my_ST_mc = []
@@ -73,6 +75,7 @@ def do_bh_analysis():
             nentries+=signal_num
         elif mode in ['signal_search']:
             my_ST_signal = my_ST_signal.values
+        return my_ST_data, my_ST_mc, my_ST_signal
 
         print len(my_ST_data)
         normed_counts_data, bb_edges = np.histogram(my_ST_data,bayesian_blocks(my_ST_data,p0=p0), density=True)
@@ -109,7 +112,7 @@ def do_bh_analysis():
 
         if mode in ['signal_search','signal_search_inj']:
             make_hist_ratio_blackhole(bb_edges, rescaled_counts_data, rescaled_counts_mc, rescaled_err, str(ST), suffix = None, bg_est=bg_est, signal = rescaled_counts_signal, mode = mode)
-            make_hist_ratio_blackhole(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', bg_est=bg_est, signal = rescaled_counts_signal_nobb, mode=mode)
+            make_hist_ratio_blackhole2(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', bg_est=bg_est, signal = rescaled_counts_signal_nobb, mode=mode)
         else:
             make_hist_ratio_blackhole(bb_edges, rescaled_counts_data, rescaled_counts_mc, rescaled_err, str(ST), suffix = None, bg_est=bg_est, mode=mode)
             make_hist_ratio_blackhole(nobb_edges, rescaled_counts_data_nobb, rescaled_counts_mc_nobb, rescaled_err_nobb, str(ST), suffix = 'nobb', bg_est=bg_est, mode=mode)
@@ -135,5 +138,5 @@ def find_sample_number(df_list,weights):
     return (sample, props)
 
 if __name__ =="__main__":
-    do_bh_analysis()
+    data,mc,signal = do_bh_analysis()
 

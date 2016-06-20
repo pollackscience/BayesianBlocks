@@ -23,12 +23,19 @@ bb_dir=os.path.join(current_dir,'../..')
 print 'loaded'
 #print z_data[0:20]
 
-z_data = pkl.load(open(bb_dir+'/files/DY/ZLL.p',"rb"))
+z_data = pkl.load(open(bb_dir+'/files/DY/ZLL_v2.p',"rb"))
+z_data = z_data.query('50<Mll<150')
+
+be = bayesian_blocks(z_data[0:10000].Muon1_Pt, p0=0.01)
 
 #make_comp_plots(z_data[0:50000], 0.01, bb_dir+'/plots/',title=r'Z$\to\mu\mu$ Data', xlabel=r'$m_{\ell\ell}$ (GeV)', ylabel='A.U.',save_name='z_data_hist')
 
-z_data = z_data.query('50<Mll<150')
-bc, be = make_bb_plot(z_data[0:100000].Mll, 0.01, bb_dir+'/plots/', title=r'Z\rightarrow\mu\mu',
-        xlabel=r'$m_{\ell\ell}$ (GeV)', ylabel='Prob/(bin width)',save_name='ZLL', bins=100)
+#bc, be = make_bb_plot(z_data[0:100000].Muon1_Pt, 0.01, bb_dir+'/plots/', title=r'$Z\rightarrow\mu\mu$',
+#        xlabel=r'$pT_{\mu}$ (GeV)', ylabel='Count/(bin width)',save_name='ZLL_muon', bins=100, scale='binwidth')
+#plt.show()
+
+hist(z_data[0:10000].Muon1_Pt, bins=be, scale='binwidth', histtype = 'stepfilled', alpha=0.2)
+hist(z_data[0:10000].Muon1_Pt, bins=be, scale='binwidth', histtype='marker',markersize=10,color='k', errorbars=True)
 plt.show()
+
 
