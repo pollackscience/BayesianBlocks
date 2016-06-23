@@ -256,24 +256,42 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
     Use these values to create the q0 statistic.'''
 
     bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-    bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+    if bg_params:
+        bg_model.set_bounds([(bg_params[0], bg_params[0]), (bg_params[1], bg_params[1]), (bg_params[2], bg_params[2])])
+    else:
+        bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
 
     bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
-    bg_sig_model.set_bounds([(0, 1), ( 120,  130), (1, 4), (-1., 1.), (-1., 1.), (-1., 1.)])
+    if sig_params:
+        if len(sig_params)==5:
+            bg_sig_model.set_bounds([(0, 1), ( sig_params[0],  sig_params[0]), (sig_params[1], sig_params[1]), (sig_params[2], sig_params[2]), (sig_params[3], sig_params[3]), (sig_params[4], sig_params[4])])
+        else:
+            bg_sig_model.set_bounds([( sig_params[0],  sig_params[0]), (sig_params[1], sig_params[1]), (sig_params[2], sig_params[2]), (sig_params[3], sig_params[3]), (sig_params[4], sig_params[4]), (sig_params[5], sig_params[5])])
+    else:
+        bg_sig_model.set_bounds([(0, 1), ( 120,  130), (1, 4), (-1., 1.), (-1., 1.), (-1., 1.)])
     #bg_sig_model.set_bounds([(0, 1), ( 125.77,  125.77), (2.775, 2.775), (-0.957, -0.957), (0.399, 0.399), (-0.126, -0.126)])
 
+    #if bg_params:
+    #    bg_nll = bg_model.nll(np.asarray(data),bg_params)
+    #else:
+    mc_bg_only_fitter = ff.NLLFitter(bg_model, np.asarray(data),verbose=False)
     if bg_params:
-        bg_nll = bg_model.nll(np.asarray(data),bg_params)
+        mc_bg_only_result = mc_bg_only_fitter.fit([ bg_params[0], bg_params[1], bg_params[2]], calculate_corr = False)
     else:
-        mc_bg_only_fitter = ff.NLLFitter(bg_model, np.asarray(data),verbose=False)
         mc_bg_only_result = mc_bg_only_fitter.fit([ -0.963, 0.366, -0.091], calculate_corr = False)
-        bg_nll = mc_bg_only_result.fun
+    bg_nll = mc_bg_only_result.fun
+    #if sig_params:
+    #    bg_sig_nll = bg_sig_model.nll(np.asarray(data),sig_params)
+    #else:
+    mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(data),verbose=False)
     if sig_params:
-        bg_sig_nll = bg_sig_model.nll(np.asarray(data),sig_params)
+        if len(sig_params)==5:
+            mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, sig_params[0], sig_params[1], sig_params[2], sig_params[3], sig_params[4]], calculate_corr = False)
+        else:
+            mc_bg_sig_result = mc_bg_sig_fitter.fit([sig_params[0], sig_params[1], sig_params[2], sig_params[3], sig_params[4], sig_params[5]], calculate_corr = False)
     else:
-        mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(data),verbose=False)
         mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.77, 2.775, -0.957, 0.399, -0.126], calculate_corr = False)
-        bg_sig_nll = mc_bg_sig_result.fun
+    bg_sig_nll = mc_bg_sig_result.fun
     q0 = 2*max(bg_nll-bg_sig_nll,0)
     return q0
 
@@ -399,6 +417,7 @@ if __name__ == "__main__":
     signif_nll_fit_hist = []
     signif_nll_constrained_hist = []
     signif_nll_true_hist = []
+    signif_nll_true_fit_hist = []
     signif_bb_true_hist = []
     signif_bb_shape_hist = []
     signif_1GeV_true_hist = []
@@ -425,6 +444,11 @@ if __name__ == "__main__":
                 bg_params = [-0.957, 0.399, -0.126],
                 sig_params = [0.02306, 125.772, 2.775, -0.957, 0.399, -0.126])
         signif_nll_true_hist.append(np.sqrt(q0_nll_true))
+
+        q0_nll_true_fit = generate_q0_via_nll_unbinned(mc_bg_sig,
+                bg_params = [-0.957, 0.399, -0.126],
+                sig_params = [125.772, 2.775, -0.957, 0.399, -0.126])
+        signif_nll_true_fit_hist.append(np.sqrt(q0_nll_true_fit))
 
         q0_bb_true = generate_q0_via_bins(mc_bg_sig, be_hybrid, true_bg_bc, true_sig_bc)
         signif_bb_true_hist.append(np.sqrt(q0_bb_true))

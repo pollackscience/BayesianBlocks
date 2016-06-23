@@ -19,7 +19,7 @@ def do_bh_analysis():
     log = True
     STs = [2,3,4,5,6,7,8,9,10]
     ST_low = [2300,2300,2300,2600,2600,2600,2800,2800,2900]
-    ST_low = [2300]*9
+    ST_low = [2500]*9
     ST_low_dict = dict(zip(STs,ST_low))
     samples = 5000
     seed = 2
@@ -131,6 +131,7 @@ def find_sample_number(df_list,weights):
     props = [i/min(props) for i in props]
     props = [i/sum(props) for i in props]
     props = [np.nan_to_num(i) for i in props]
+    print props
     for sample in range(min(map(len,df_list)), max(map(len,df_list))):
         for j in range(len(props)):
             if int(sample*props[j])>len(df_list[j]):
