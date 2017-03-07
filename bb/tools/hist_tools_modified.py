@@ -133,6 +133,14 @@ def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, 
         bin_content, bins, vis_objects = ax.hist(x, bins, **kwargs)
         bin_content = np.asarray(bin_content, dtype=float)
         bin_error = np.sqrt(bin_content)
+        width = (bins[1:]-bins[:-1])
+        bin_centers = bins[:-1]+width*0.5
+        #if 'histtype' in kwargs:
+        #    kwargs.pop('histtype')
+        #if 'weights' in kwargs:
+        #    kwargs.pop('weights')
+        #vis_objects = ax.errorbar(bin_centers, bin_content, linestyle = '', marker = '.',
+        #                          yerr=bin_error, linewidth=2, **kwargs)
 
 # perform any scaling if necessary, including redrawing of the scaled objects
     if scale:
