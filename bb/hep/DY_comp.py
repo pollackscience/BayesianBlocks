@@ -98,7 +98,7 @@ def fancy_plots_pt(bin_style='bb'):
         bin_centers = (be[1:]+be[:-1])/2
         print len(bin_centers)
     else:
-        _, be = np.histogram(pt_data.leading_jet_pT, 20, range=xlims)
+        _, be = np.histogram(pt_data.leading_jet_pT, 15, range=xlims)
         bin_centers = (be[1:]+be[:-1])/2
 
     fig = plt.figure()
