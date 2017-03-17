@@ -24,6 +24,7 @@ def lm_binned_wrapper(mu_bg, mu_sig):
         return proper_means[ix]
     return lm_binned
 
+
 def bg_pdf_simp(x, a, doROOT=False):
     '''BG parameterization from BH analysis:
     f(x)=(A(1+x)^alpha)/(x^(beta+gamma*ln(x)))
@@ -33,14 +34,14 @@ def bg_pdf_simp(x, a, doROOT=False):
     '''
     if doROOT:
         x = x[0]  # This is a ROOT-compatible hack
-    #print a[0]*((1+x)**a[1])/(x**(a[2]+a[3]*np.log(x)))
+    # print a[0]*((1+x)**a[1])/(x**(a[2]+a[3]*np.log(x)))
     return (1./a[1])*np.exp(-(x-a[0])/a[1])
 
 
+# def bg_pdf_helper(x, a0, a2):
 def bg_pdf_helper(x, a0, a1, a2):
-#def bg_pdf_helper(x, a0, a2):
     return ((1+x)**a0)/(x**(a1+a2*np.log(x)))
-    #return ((1+x)**a0)/(x**(a2*np.log(x)))
+    # return ((1+x)**a0)/(x**(a2*np.log(x)))
 
 
 def bg_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
@@ -55,7 +56,7 @@ def bg_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
         x = x[0]  # This is a ROOT-compatible hack
 
     func = functools.partial(bg_pdf_helper, a0=a[0], a1=a[1], a2=a[2])
-    #func = functools.partial(bg_pdf_helper, a0=a[0], a2=a[1])
+    # func = functools.partial(bg_pdf_helper, a0=a[0], a2=a[1])
     return func(x)/integrate.quad(func, 2800, 13000)[0]
 
 
@@ -69,14 +70,14 @@ def sig_pdf(x, a, doROOT=False):
     return (1.0/(a[1]*np.sqrt(2*np.pi)))*np.exp(-(x-a[0])**2/(2*a[1]**2))
 
 
-def bg_sig_pdf(x, a, xlow=100, xhigh=180, doROOT=False):
-    '''legendre bg pdf and gaussian signal pdf, with a relative normalization factor.
+def bg_sig_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
+    '''BH bg pdf and gaussian signal pdf, with a relative normalization factor.
     a[0]: normalization and signal strength parameter
     a[1]: signal mean
     a[2]: signal sigma
-    a[3]: bg O(x)   free parameter
-    a[4]: bg O(x^2) free parameter
-    a[5]: bg O(x^3) free parameter
+    a[3]: alpha   free parameter
+    a[4]: beta    free parameter
+    a[5]: gamma   free parameter
     '''
     if doROOT:
         x = x[0]            # this is a ROOT-compatible hack
@@ -117,114 +118,6 @@ def find_gt(a, x):
     raise ValueError
 
 
-def get_mismatch_metric(bc_nominal, be_nominal, bc_test, be_test):
-    '''Calculate the total mismatch between two binning schemes.
-    Pass bin content and bin edges of the two histograms for comparison'''
-    metric = 0
-    for i in range(len(be_test)-1):
-        low_edge_test         = be_test[i]
-        hi_edge_test          = be_test[i+1]
-        ni1, low_nom_low_test = find_le(be_nominal, low_edge_test)
-        hi_nom_low_test       = find_gt(be_nominal, low_edge_test)[1]
-        ni2, low_nom_hi_test  = find_lt(be_nominal, hi_edge_test)
-        hi_nom_hi_test        = find_ge(be_nominal, hi_edge_test)[1]
-        bc_nom_1              = bc_nominal[ni1]
-        try:
-            bc_nom_2 = bc_nominal[ni2]
-        except:
-            bc_nom_2 = -1
-
-        if low_edge_test == low_nom_low_test and hi_edge_test == hi_nom_hi_test:
-            # low and high edges for nominal and test match, ignore them and go to next bin
-            continue
-        elif low_nom_low_test == low_nom_hi_test and hi_nom_low_test == hi_nom_hi_test:
-            # test bin completely contained in nominal bin (easy case)
-            metric += abs(bc_nom_1 - bc_test[i])
-        else:
-            # test bin overlaps two bg bins (harder case)
-            width_test = hi_edge_test - low_edge_test
-            low_width_test = hi_nom_low_test - low_edge_test
-            hi_width_test = hi_edge_test - hi_nom_low_test
-            metric += abs(bc_nom_1-bc_test[i])*(low_width_test/width_test)
-            metric += abs(bc_nom_2-bc_test[i])*(hi_width_test/width_test)
-    return metric
-
-
-def get_mismatch_metric_v2(bc_nominal, be_nominal, bc_test, be_test, main_edge):
-    '''Calculate the total mismatch between two binning schemes.
-    Pass bin content and bin edges of the two histograms for comparison'''
-    metric = 0
-    for i in range(len(be_test)-1):
-        low_edge_test         = be_test[i]
-        hi_edge_test          = be_test[i+1]
-        ni1, low_nom_low_test = find_le(be_nominal, low_edge_test)
-        hi_nom_low_test       = find_gt(be_nominal, low_edge_test)[1]
-        ni2, low_nom_hi_test  = find_lt(be_nominal, hi_edge_test)
-        hi_nom_hi_test        = find_ge(be_nominal, hi_edge_test)[1]
-        bc_nom_1              = bc_nominal[ni1]
-        try:
-            bc_nom_2 = bc_nominal[ni2]
-        except:
-            bc_nom_2 = -1
-
-        if low_edge_test == low_nom_low_test and hi_edge_test == hi_nom_hi_test:
-            # low and high edges for nominal and test match, ignore them and go to next bin
-            continue
-        elif low_nom_low_test == low_nom_hi_test and hi_nom_low_test == hi_nom_hi_test:
-            # test bin completely contained in nominal bin (easy case)
-            if low_edge_test == main_edge:
-                metric += 2*(bc_test[i]-bc_nom_1)
-            else:
-                metric += abs(bc_nom_1 - bc_test[i])
-        else:
-            # test bin overlaps two bg bins (harder case)
-            width_test = hi_edge_test - low_edge_test
-            low_width_test = hi_nom_low_test - low_edge_test
-            hi_width_test = hi_edge_test - hi_nom_low_test
-            if low_edge_test == main_edge:
-                metric += 2*(bc_test[i]-bc_nom_1)*(low_width_test/width_test)
-                metric += 2*(bc_test[i]-bc_nom_2)*(hi_width_test/width_test)
-            else:
-                metric += abs(bc_nom_1-bc_test[i])*(low_width_test/width_test)
-                metric += abs(bc_nom_2-bc_test[i])*(hi_width_test/width_test)
-    return metric
-
-
-def get_mismatch_metric_v3(bc_nominal, be_nominal, bc_test, be_test, main_edge):
-    '''Calculate the total mismatch between two binning schemes.
-    Pass bin content and bin edges of the two histograms for comparison'''
-    metric = 0
-    for i in range(len(be_test)-1):
-        low_edge_test         = be_test[i]
-        hi_edge_test          = be_test[i+1]
-        ni1, low_nom_low_test = find_le(be_nominal, low_edge_test)
-        hi_nom_low_test       = find_gt(be_nominal, low_edge_test)[1]
-        ni2, low_nom_hi_test  = find_lt(be_nominal, hi_edge_test)
-        hi_nom_hi_test        = find_ge(be_nominal, hi_edge_test)[1]
-        bc_nom_1              = bc_nominal[ni1]
-        try:
-            bc_nom_2 = bc_nominal[ni2]
-        except:
-            bc_nom_2 = -1
-
-        if low_edge_test == low_nom_low_test and hi_edge_test == hi_nom_hi_test:
-            # low and high edges for nominal and test match, ignore them and go to next bin
-            continue
-        elif low_nom_low_test == low_nom_hi_test and hi_nom_low_test == hi_nom_hi_test:
-            # test bin completely contained in nominal bin (easy case)
-            if low_edge_test == main_edge:
-                metric += 2*(bc_test[i]-bc_nom_1)
-        else:
-            # test bin overlaps two bg bins (harder case)
-            width_test = hi_edge_test - low_edge_test
-            low_width_test = hi_nom_low_test - low_edge_test
-            hi_width_test = hi_edge_test - hi_nom_low_test
-            if low_edge_test == main_edge:
-                metric += 2*(bc_test[i]-bc_nom_1)*(low_width_test/width_test)
-                metric += 2*(bc_test[i]-bc_nom_2)*(hi_width_test/width_test)
-    return metric
-
-
 def calc_local_pvalue(N_bg, var_bg, N_sig, var_sig, ntoys=1e7):
     '''Not an accurate estimate for large sigma'''
     print ''
@@ -237,31 +130,20 @@ def calc_local_pvalue(N_bg, var_bg, N_sig, var_sig, ntoys=1e7):
     print 'local significance = {0:.2f}'.format(np.abs(norm.ppf(1-pval)))
 
 
-def generate_initial_params(hgg_bg, hgg_signal, n_sigma):
-    '''Input bg and signal dataframes, and a sigma value for signal injection.
-    Output parameters for the pdfs that describe those distributions.'''
-    # grab a handful of bg events, and an ~X sigma number of signal events
-    hgg_bg_selection     = hgg_bg[(hgg_bg.Mgg > 100) & (hgg_bg.Mgg < 180)][0:10000].Mgg
-    n_bg_under_sig       = hgg_bg_selection[(118 < hgg_bg_selection) &
-                                            (hgg_bg_selection < 133)].size
-    n_sig                = int(n_sigma*np.sqrt(n_bg_under_sig))
-    hgg_signal_selection = hgg_signal[(hgg_signal.Mgg >= 118) &
-                                      (hgg_signal.Mgg <= 133)][0:n_sig].Mgg
-    data_bg              = hgg_bg_selection.values
-    data_sig             = hgg_signal_selection.values
+def generate_initial_params(data_bg_mul2, data_bg_mul8):
 
     # fit to the data distributions
-    bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-    bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
-    bg_fitter = ff.NLLFitter(bg_model, data_bg)
-    bg_result = bg_fitter.fit([0.0, 0.0, 0.0])
+    bg_model = ff.Model(bg_pdf, ['alpha', 'beta', 'gamma'])
+    bg_model.set_bounds([(-200, 200), (-100, 100), (-100,100)])
+    bg_fitter = ff.NLLFitter(bg_model, data_bg_mul2)
+    bg_result = bg_fitter.fit([-1.80808e+01, -8.21174e-02, 8.06289e-01])
 
-    sig_model = ff.Model(sig_pdf, ['mu', 'sigma'])
-    sig_model.set_bounds([(110, 130), (1, 5)])
-    sig_fitter = ff.NLLFitter(sig_model, data_sig)
-    sig_result = sig_fitter.fit([120.0, 2])
+    #sig_model = ff.Model(sig_pdf, ['mu', 'sigma'])
+    #sig_model.set_bounds([(110, 130), (1, 5)])
+    #sig_fitter = ff.NLLFitter(sig_model, data_sig)
+    #sig_result = sig_fitter.fit([120.0, 2])
 
-    n_bg = len(data_bg)
+    n_bg = len(data_bg_mul8)
 
     be_bg = bayesian_blocks(data_bg, p0=0.02)
     be_sig = bayesian_blocks(data_sig, p0=0.02)
@@ -401,21 +283,17 @@ def generate_q0_via_shape_fit(data, bin_edges, binned_model, binned_params):
 
 if __name__ == "__main__":
     plt.close('all')
-    current_dir = os.path.dirname(__file__)
-    bb_dir      = os.path.join(current_dir, '../..')
-    hgg_bg      = pkl.load(open(bb_dir+'/files/hgg_bg.p', "rb"))
-    hgg_signal  = pkl.load(open(bb_dir+'/files/hgg_signal.p', "rb"))
+    bb_dir  = os.path.join(os.path.dirname(__file__), '../..')
+    df_data_mul2 = pkl.load(open(bb_dir+'/files/BH/BH_test_data.p','rb'))
+    data_bg_mul2 = df_data_mul2[df_data_mul2.ST_mul2_BB>=2800].ST_mul2_BB.values
+
+    df_data_mul8 = pkl.load(open(bb_dir+'/files/BH/BH_paper_data.p','rb'))
+    data_bg_mul8 = df_data_mul8[df_data_mul8.ST_mul8_BB>=2800].ST_mul8_BB.values
 
     bg_result, sig_result, n_bg, n_sig, be_bg, be_sig = generate_initial_params(
         hgg_bg, hgg_signal, 5)
-    be_hybrid = np.concatenate([be_bg[be_bg < be_sig[0]-1.5],
-                                be_sig,
-                                be_bg[be_bg > be_sig[-1]+1.5]])
 
-    be_1GeV = np.linspace(100, 180, 81)
-    be_2GeV = np.linspace(100, 180, 41)
-    be_5GeV = np.linspace(100, 180, 17)
-    be_10GeV = np.linspace(100, 180, 9)
+    be_100GeV = np.linspace(2800, 13000, 103)
 
     true_bg_bc  = []
     true_sig_bc = []
