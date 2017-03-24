@@ -3,24 +3,28 @@
 from __future__ import division
 import os
 import functools
-import bisect
 import numpy as np
 from scipy.stats import norm
 import scipy.integrate as integrate
 from scipy.stats import poisson
 import cPickle as pkl
 from matplotlib import pyplot as plt
+from matplotlib.ticker import MaxNLocator
+from matplotlib import gridspec
 from lmfit import Model
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
+from bb.tools.hist_tools_modified import hist
 import nllfitter.future_fitter as ff
 from ROOT import gRandom
 from ROOT import TF1
-from tqdm import tqdm
+from tqdm import tqdm_notebook
+from bb.tools.fill_between_steps import fill_between_steps
+# from bb.tools.hist_tools_modified import hist
 
 
 def lm_binned_wrapper(mu_bg, mu_sig):
     def lm_binned(ix, A, ntot):
-        proper_means = ((mu_bg+A*mu_sig)/np.sum(mu_bg+A*mu_sig))*ntot
+        proper_means = (((1-A)*mu_bg+A*mu_sig)/np.sum((1-A)*mu_bg+A*mu_sig))*ntot
         return proper_means[ix]
     return lm_binned
 
@@ -77,7 +81,8 @@ def bg_sig_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
     a[2]: signal sigma
     a[3]: alpha   free parameter
     a[4]: beta    free parameter
-    a[5]: gamma   free parameter
+    a[5]: gamma   free parameter, tqdm_notebook, tqdm_notebook, tqdm_notebook, tqdm_notebook,
+    tqdm_notebook, tqdm_notebook
     '''
     if doROOT:
         x = x[0]            # this is a ROOT-compatible hack
@@ -86,323 +91,248 @@ def bg_sig_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
     return (1 - a[0])*bg_pdf(x, b, xlow=xlow, xhigh=xhigh) + a[0]*sig_pdf(x, c)
 
 
-def find_le(a, x):
-    '''Find rightmost value less than or equal to x'''
-    i = bisect.bisect_right(a, x)
-    if i:
-        return i-1, a[i-1]
-    raise ValueError
-
-
-def find_lt(a, x):
-    '''Find rightmost value less than x'''
-    i = bisect.bisect_left(a, x)
-    if i:
-        return i-1, a[i-1]
-    raise ValueError
-
-
-def find_ge(a, x):
-    '''Find leftmost item greater than or equal to x'''
-    i = bisect.bisect_left(a, x)
-    if i != len(a):
-        return i, a[i]
-    raise ValueError
-
-
-def find_gt(a, x):
-    '''Find leftmost value greater than x'''
-    i = bisect.bisect_right(a, x)
-    if i != len(a):
-        return i, a[i]
-    raise ValueError
-
-
-def calc_local_pvalue(N_bg, var_bg, N_sig, var_sig, ntoys=1e7):
-    '''Not an accurate estimate for large sigma'''
-    print ''
-    print 'Calculating local p-value and significance based on {0} toys'.format(ntoys)
-    print 'N_bg = {0}, sigma_bg = {1}, N_signal = {2}'.format(N_bg, var_bg, N_sig)
-    toys    = np.random.normal(N_bg, var_bg, int(ntoys))
-    pvars   = np.random.poisson(toys)
-    pval    = pvars[pvars > N_bg + N_sig].size/ntoys
-    print 'local p-value = {0}'.format(pval)
-    print 'local significance = {0:.2f}'.format(np.abs(norm.ppf(1-pval)))
-
-
 def generate_initial_params(data_bg_mul2, data_bg_mul8):
 
     # fit to the data distributions
     bg_model = ff.Model(bg_pdf, ['alpha', 'beta', 'gamma'])
-    bg_model.set_bounds([(-200, 200), (-100, 100), (-100,100)])
+    bg_model.set_bounds([(-200, 200), (-100, 100), (-100, 100)])
     bg_fitter = ff.NLLFitter(bg_model, data_bg_mul2)
     bg_result = bg_fitter.fit([-1.80808e+01, -8.21174e-02, 8.06289e-01])
-
-    #sig_model = ff.Model(sig_pdf, ['mu', 'sigma'])
-    #sig_model.set_bounds([(110, 130), (1, 5)])
-    #sig_fitter = ff.NLLFitter(sig_model, data_sig)
-    #sig_result = sig_fitter.fit([120.0, 2])
-
     n_bg = len(data_bg_mul8)
 
-    be_bg = bayesian_blocks(data_bg, p0=0.02)
-    be_sig = bayesian_blocks(data_sig, p0=0.02)
+    gRandom.SetSeed(111)
 
-    return bg_result, sig_result, n_bg, n_sig, be_bg, be_sig
+    # Set up bg sampling
+    bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
+    tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 2800, 13000, 3)
+    tf1_bg_pdf.SetParameters(*bg_result.x)
+    mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
 
 
-def generate_toy_data(bg_params, sig_params, n_bg, n_sig, seed=None):
+    be_bg = bayesian_blocks(mc_bg, p0=0.02)
+    be_bg = np.append(be_bg, [13000])
+    be_bg[0] = 2800
+    print be_bg
+    # hist(data_bg_mul8, bins=be_bg, scale='binwidth')
+    # plt.show()
+
+    return bg_result, n_bg, be_bg
+
+
+def generate_toy_data(bg_params, n_bg):
     '''use bg and signal params to generated simulated data'''
     # bg dist
     bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
-    tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 100, 180, 3)
+    tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 2800, 13000, 3)
     tf1_bg_pdf.SetParameters(*bg_params)
-    # signal dist
-    sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
-    tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 100, 180, 2)
-    tf1_sig_pdf.SetParameters(*sig_params)
     mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
-    mc_sig = [tf1_sig_pdf.GetRandom() for i in xrange(n_sig)]
-    return mc_bg, mc_sig
+    return mc_bg
 
 
-def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
-    '''Perform two nll fits to data, one for bg+signal, one for bg-only.
-    Use these values to create the q0 statistic.'''
+def calc_A_unbinned(data, model, bg_params, sig_params):
+    '''Given input data and the true distribution parameters, calculate the 95% UL for the unbinned
+    data.  The bg and signal parameters are held fixed.  The best-fit A value is determined first,
+    then the 95% UL is determined by scanning for the correct value of A that leads to a p-value of
+    0.05.  This procedure must be run many times and averaged to get the mean UL value and error
+    bands.'''
 
-    bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-    if bg_params:
-        bg_model.set_bounds([(bg_params[0], bg_params[0]), (bg_params[1], bg_params[1]),
-                             (bg_params[2], bg_params[2])])
-    else:
-        bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+    mu = sig_params[0]
+    sigma = sig_params[1]
+    alpha = bg_params[0]
+    beta = bg_params[1]
+    gamma = bg_params[2]
 
-    bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
-    if sig_params:
-        if len(sig_params) == 5:
-            bg_sig_model.set_bounds([(0, 1), (sig_params[0], sig_params[0]),
-                                     (sig_params[1], sig_params[1]),
-                                     (sig_params[2], sig_params[2]),
-                                     (sig_params[3], sig_params[3]),
-                                     (sig_params[4], sig_params[4])])
+    # Obtain the best fit value for A
+    model.set_bounds([(0, 1), (mu, mu), (sigma, sigma),
+                      (alpha, alpha), (beta, beta), (gamma, gamma)])
+    mle_fitter = ff.NLLFitter(model, np.asarray(data), verbose=False)
+    mle_res = mle_fitter.fit([0.01, mu, sigma, alpha, beta, gamma], calculate_corr=False)
+
+    # Now scan through A values to find the one that leads to a p-value of 0.05
+    pval = -1
+    right = 1
+    left = mle_res.x[0]
+    A_scan = 0.5*(left+right)
+    while not np.isclose(pval, 0.05, 0.0001, 0.0001):
+        model.set_bounds([(A_scan*(1-1e-8), A_scan*(1+1e-8)), (mu, mu), (sigma, sigma),
+                          (alpha, alpha), (beta, beta), (gamma, gamma)])
+        scan_fitter = ff.NLLFitter(model, np.asarray(data), verbose=False)
+        scan_res = scan_fitter.fit([A_scan, mu, sigma, alpha, beta, gamma], calculate_corr=False)
+        # find pval
+        qu = 2*max(scan_res.fun-mle_res.fun, 0)
+        pval = 1-norm.cdf(qu)
+        if pval < 0.05:
+            right = A_scan
+            A_scan = 0.5*(right+left)
         else:
-            bg_sig_model.set_bounds([(sig_params[0], sig_params[0]),
-                                     (sig_params[1], sig_params[1]),
-                                     (sig_params[2], sig_params[2]),
-                                     (sig_params[3], sig_params[3]),
-                                     (sig_params[4], sig_params[4]),
-                                     (sig_params[5], sig_params[5])])
-    else:
-        bg_sig_model.set_bounds([(0, 1), (120, 130), (1, 4), (-1., 1.), (-1., 1.), (-1., 1.)])
+            left = A_scan
+            A_scan = 0.5*(right+left)
 
-    mc_bg_only_fitter = ff.NLLFitter(bg_model, np.asarray(data), verbose=False)
-    if bg_params:
-        mc_bg_only_result = mc_bg_only_fitter.fit([bg_params[0], bg_params[1], bg_params[2]],
-                                                  calculate_corr=False)
-    else:
-        mc_bg_only_result = mc_bg_only_fitter.fit([-0.963, 0.366, -0.091], calculate_corr=False)
-    bg_nll = mc_bg_only_result.fun
-
-    mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(data), verbose=False)
-    if sig_params:
-        if len(sig_params) == 5:
-            mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, sig_params[0], sig_params[1],
-                                                     sig_params[2], sig_params[3], sig_params[4]],
-                                                    calculate_corr=False)
-        else:
-            mc_bg_sig_result = mc_bg_sig_fitter.fit([sig_params[0], sig_params[1], sig_params[2],
-                                                     sig_params[3], sig_params[4], sig_params[5]],
-                                                    calculate_corr=False)
-    else:
-        mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.77, 2.775, -0.957, 0.399, -0.126],
-                                                calculate_corr=False)
-    bg_sig_nll = mc_bg_sig_result.fun
-    q0 = 2*max(bg_nll-bg_sig_nll, 0)
-    return q0
+    return scan_res.x[0]
 
 
-def generate_q0_via_nll_unbinned_constrained(bg, data):
-    '''Perform two nll fits to data, one for bg+signal, one for bg-only.
-    Use these values to create the q0 statistic.'''
+def calc_A_binned(data, bin_edges, binned_model, params):
+    '''Given input data and the true template, calculate the 95% UL for binned data
+    data.  The bg and signal templates are held fixed.  The best-fit A value is determined first,
+    then the 95% UL is determined by scanning for the correct value of A that leads to a p-value of
+    0.05.  This procedure must be run many times and averaged to get the mean UL value and error
+    bands.'''
 
-    data = np.asarray(data)
-    bg = np.asarray(bg)
-    bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-    bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
-
-    mc_bg_only_fitter = ff.NLLFitter(bg_model, bg, verbose=False)
-    mc_bg_only_result = mc_bg_only_fitter.fit([-0.963, 0.366, -0.091], calculate_corr=False)
-    bg_ps = mc_bg_only_result.x
-    bg_nll = bg_model.nll(data, bg_ps)
-
-    bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'a1', 'a2', 'a3'])
-    bg_sig_model.set_bounds([(0, 1), (125.77, 125.77), (2.775, 2.775), (bg_ps[0], bg_ps[0]),
-                             (bg_ps[1], bg_ps[1]), (bg_ps[2], bg_ps[2])])
-
-    mc_bg_sig_fitter = ff.NLLFitter(bg_sig_model, np.asarray(data), verbose=False)
-    mc_bg_sig_result = mc_bg_sig_fitter.fit([0.01, 125.77, 2.775, bg_ps[0], bg_ps[1], bg_ps[2]],
-                                            calculate_corr=False)
-    bg_sig_nll = mc_bg_sig_result.fun
-    q0 = 2*max(bg_nll-bg_sig_nll, 0)
-
-    return q0
-
-
-def generate_q0_via_bins(data, bin_edges, true_bg_bc, true_sig_bc):
-    '''Generate likelihood ratios based on poisson distributions for each bin
-    in binned data.  True values for bg and bg+signal are determined from integration of
-    underlying pdfs used to generate toys.
-    Use these values to create the q0 statistic.'''
-
-    bc, bin_edges = np.histogram(data, bin_edges, range=(100, 180))
-    l_bg  = 1
-    l_sig = 1
-    for i in range(len(bin_edges)-1):
-        l_bg  *= poisson.pmf(bc[i], true_bg_bc[i])
-        l_sig *= poisson.pmf(bc[i], true_bg_bc[i]+true_sig_bc[i])
-
-    q0 = -2*(np.log(l_bg)-np.log(l_sig))
-    return q0
-
-
-def generate_q0_via_shape_fit(data, bin_edges, binned_model, binned_params):
-    '''Generate likelihood ratios based on a template fit to the data.
-    Shape values for bg and signal are determined from integration of
-    underlying pdfs used to generate toys.
-    Use these values to create the q0 statistic.'''
-
-    bc, bin_edges = np.histogram(data, bin_edges, range=(100, 180))
+    bc, bin_edges = np.histogram(data, bin_edges, range=(2800, 13000))
     ibc = np.asarray(range(len(bc)))
-    result = binned_model.fit(bc, ix=ibc, params=binned_params)
-    nll_bg = -np.sum(np.log(poisson.pmf(bc, result.eval(A=0))))
-    nll_sig = -np.sum(np.log(poisson.pmf(bc, result.best_fit)))
+    result = binned_model.fit(bc, ix=ibc, params=params)
+    # plt.plot(ibc, bc,         'bo')
+    # plt.plot(ibc, result.best_fit, 'r-')
+    # plt.show()
+    # raw_input()
+    nll_mle = -np.sum(np.log(poisson.pmf(bc, result.best_fit)))
 
-    q0 = 2*(nll_bg-nll_sig)
-    return q0
+    pval = -1
+    right = 1
+    left = result.params['A'].value
+    A_scan = 0.5*(left+right)
+    while not np.isclose(pval, 0.05, 0.0001, 0.0001):
+        # find pval
+        nll_scan = -np.sum(np.log(poisson.pmf(bc, result.eval(A=A_scan))))
+        qu = 2*max(nll_scan-nll_mle, 0)
+        pval = 1-norm.cdf(qu)
+        if pval < 0.05:
+            right = A_scan
+            A_scan = 0.5*(right+left)
+        else:
+            left = A_scan
+            A_scan = 0.5*(right+left)
+
+    return A_scan
+
+
+def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='bh_vis_ex'):
+    xlims = (be[0], be[-1])
+    ratlims = (0, 6)
+
+    bin_centers = (be[1:]+be[:-1])/2
+
+    fig = plt.figure()
+    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+    ax1 = fig.add_subplot(gs[0])
+    ax1.set_yscale("log", nonposy='clip')
+    ax2 = fig.add_subplot(gs[1], sharex=ax1)
+    ax1.grid(True)
+    ax2.grid(True)
+    # ax2.set_yscale("log", nonposy='clip')
+    plt.setp(ax1.get_xticklabels(), visible=False)
+    fig.subplots_adjust(hspace=0.001)
+    ax1.set_xlim(xlims)
+
+    # print 'lims'
+    bc_d, _ = np.histogram(data, bins=be)
+    bc_mc, _ = np.histogram(mc, bins=be, weights=[len(data)/(len(mc))]*(len(mc)))
+    hist(data, ax=ax1, bins=be, scale='binwidth', histtype='marker', markersize=10, color='k',
+         errorbars=True, label='Sim Data')
+
+    hist(mc, ax=ax1, bins=be, scale='binwidth', weights=[len(data)/(len(mc))]*(len(mc)),
+         histtype='stepfilled', alpha=0.2, label='Sim Background')
+    ax1.legend()
+    ratio = bc_d/bc_mc
+    ratio_err = np.sqrt(bc_d)/bc_mc
+    fill_between_steps(ax2, be, ratio+ratio_err, ratio-ratio_err, alpha=0.2, step_where='pre',
+                       linewidth=0, color='red')
+    ax2.errorbar(bin_centers, ratio, yerr=None, xerr=[np.abs(be[0:-1]-bin_centers),
+                                                      np.abs(be[1:]-bin_centers)], fmt='ok')
+    ax2.set_xlabel(r'$S_T$ (GeV)', fontsize=17)
+    ax2.set_ylabel('Data/BG', fontsize=17)
+    ax1.set_ylabel(r'N/$\Delta$x', fontsize=17)
+    ax2.get_yaxis().get_major_formatter().set_useOffset(False)
+    ax2.axhline(1, linewidth=2, color='r')
+    ax2.yaxis.set_major_locator(MaxNLocator(nbins=7, prune='upper'))
+    ax2.set_ylim(ratlims)
+
+    ax1.set_title(title)
+    plt.savefig('figures/{}.pdf'.format(save_name))
+    plt.savefig('figures/{}.png'.format(save_name))
+
+    plt.show()
 
 
 if __name__ == "__main__":
     plt.close('all')
     bb_dir  = os.path.join(os.path.dirname(__file__), '../..')
-    df_data_mul2 = pkl.load(open(bb_dir+'/files/BH/BH_test_data.p','rb'))
-    data_bg_mul2 = df_data_mul2[df_data_mul2.ST_mul2_BB>=2800].ST_mul2_BB.values
+    df_data_mul2 = pkl.load(open(bb_dir+'/files/BH/BH_test_data.p', 'rb'))
+    data_bg_mul2 = df_data_mul2[df_data_mul2.ST_mul2_BB >= 2800].ST_mul2_BB.values
 
-    df_data_mul8 = pkl.load(open(bb_dir+'/files/BH/BH_paper_data.p','rb'))
-    data_bg_mul8 = df_data_mul8[df_data_mul8.ST_mul8_BB>=2800].ST_mul8_BB.values
+    df_data_mul8 = pkl.load(open(bb_dir+'/files/BH/BH_paper_data.p', 'rb'))
+    data_bg_mul8 = df_data_mul8[df_data_mul8.ST_mul8_BB >= 2800].ST_mul8_BB.values
 
-    bg_result, sig_result, n_bg, n_sig, be_bg, be_sig = generate_initial_params(
-        hgg_bg, hgg_signal, 5)
+    bg_result, n_bg, be_bg = generate_initial_params(data_bg_mul2, data_bg_mul8)
+
+    true_bg_bc_bb  = []
+    for i in range(len(be_bg)-1):
+        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
+                                      be_bg[i], be_bg[i+1])
+        true_bg_bc_bb.append(true_bg)
 
     be_100GeV = np.linspace(2800, 13000, 103)
-
-    true_bg_bc  = []
-    true_sig_bc = []
-    for i in range(len(be_hybrid)-1):
+    true_bg_bc_100GeV  = []
+    true_sig_bc_100GeV = []
+    for i in range(len(be_100GeV)-1):
         true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_hybrid[i], be_hybrid[i+1])
-        true_bg_bc.append(true_bg*n_bg)
-        true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_result.x),
-                                      be_hybrid[i], be_hybrid[i+1])
-        true_sig_bc.append(true_sig*n_sig)
-
-    lm_binned = lm_binned_wrapper(np.asarray(true_bg_bc), np.asarray(true_sig_bc))
-    binned_model = Model(lm_binned)
-    binned_params = binned_model.make_params()
-    binned_params['ntot'].value   = n_bg+n_sig
-    binned_params['ntot'].vary    = False
-    binned_params['A'].value      = 0.1
-    binned_params['A'].min        = 0
-    binned_params['A'].max        = 1000
-
-    true_bg_bc_1GeV  = []
-    true_sig_bc_1GeV = []
-    for i in range(len(be_1GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_1GeV[i], be_1GeV[i+1])
-        true_bg_bc_1GeV.append(true_bg*n_bg)
-        true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_result.x),
-                                      be_1GeV[i], be_1GeV[i+1])
-        true_sig_bc_1GeV.append(true_sig*n_sig)
-
-    true_bg_bc_2GeV  = []
-    true_sig_bc_2GeV = []
-    for i in range(len(be_2GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_2GeV[i], be_2GeV[i+1])
-        true_bg_bc_2GeV.append(true_bg*n_bg)
-        true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_result.x),
-                                      be_2GeV[i], be_2GeV[i+1])
-        true_sig_bc_2GeV.append(true_sig*n_sig)
-
-    true_bg_bc_5GeV  = []
-    true_sig_bc_5GeV = []
-    for i in range(len(be_5GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_5GeV[i], be_5GeV[i+1])
-        true_bg_bc_5GeV.append(true_bg*n_bg)
-        true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_result.x),
-                                      be_5GeV[i], be_5GeV[i+1])
-        true_sig_bc_5GeV.append(true_sig*n_sig)
-
-    true_bg_bc_10GeV  = []
-    true_sig_bc_10GeV = []
-    for i in range(len(be_10GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_10GeV[i], be_10GeV[i+1])
-        true_bg_bc_10GeV.append(true_bg*n_bg)
-        true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_result.x),
-                                      be_10GeV[i], be_10GeV[i+1])
-        true_sig_bc_10GeV.append(true_sig*n_sig)
-
-    signif_nll_fit_hist = []
-    signif_nll_constrained_hist = []
-    signif_nll_true_hist = []
-    signif_nll_true_fit_hist = []
-    signif_bb_true_hist = []
-    signif_bb_shape_hist = []
-    signif_1GeV_true_hist = []
-    signif_2GeV_true_hist = []
-    signif_5GeV_true_hist = []
-    signif_10GeV_true_hist = []
+                                      be_100GeV[i], be_100GeV[i+1])
+        true_bg_bc_100GeV.append(true_bg)
+    #     true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=(5000, 1000)),
+    #                                   be_100GeV[i], be_100GeV[i+1])
+    #     true_sig_bc_100GeV.append(true_sig)
 
     # Do a bunch of toys
     gRandom.SetSeed(20)
 
-    for i in tqdm(range(500)):
-        mc_bg, mc_sig = generate_toy_data(bg_result.x, sig_result.x, n_bg, n_sig)
-        mc_bg_sig = mc_bg+mc_sig
+    unbinned_A = [[], [], [], []]
+    binned_A = [[], [], [], []]
+    binned_A_100 = [[], [], [], []]
+    bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'alpha', 'beta', 'gamma'])
+    sig_params = [(4000, 800), (5000, 1000), (6000, 1200), (7000, 1400)]
 
-        q0_nll_fit = generate_q0_via_nll_unbinned(mc_bg_sig)
-        signif_nll_fit_hist.append(np.sqrt(q0_nll_fit))
+    # mc_bg = generate_toy_data(bg_result.x, n_bg)
+    # res = calc_A_binned(mc_bg, be_bg, binned_model, binned_params)
+    for i, sig_p in enumerate(tqdm_notebook(sig_params, desc='Signal Model')):
 
-        q0_nll_constrained = generate_q0_via_nll_unbinned_constrained(mc_bg, mc_bg_sig)
-        signif_nll_constrained_hist.append(np.sqrt(q0_nll_constrained))
+        # Set up binned model for BB
+        true_sig_bc_bb = []
+        for k in range(len(be_bg)-1):
+            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
+                                          be_bg[k], be_bg[k+1])
+            true_sig_bc_bb.append(true_sig)
 
-        q0_nll_true = generate_q0_via_nll_unbinned(mc_bg_sig, bg_params=[-0.957, 0.399, -0.126],
-                                                   sig_params=[0.02306, 125.772, 2.775, -0.957,
-                                                               0.399, -0.126])
-        signif_nll_true_hist.append(np.sqrt(q0_nll_true))
+        lm_binned_bb = lm_binned_wrapper(np.asarray(true_bg_bc_bb), np.asarray(true_sig_bc_bb))
+        binned_model_bb = Model(lm_binned_bb)
+        binned_params_bb = binned_model_bb.make_params()
+        binned_params_bb['ntot'].value   = n_bg
+        binned_params_bb['ntot'].vary    = False
+        binned_params_bb['A'].value      = 0.1
+        binned_params_bb['A'].min        = 0
+        binned_params_bb['A'].max        = 1
 
-        q0_nll_true_fit = generate_q0_via_nll_unbinned(mc_bg_sig, bg_params=[-0.957, 0.399, -0.126],
-                                                       sig_params=[125.772, 2.775, -0.957, 0.399,
-                                                                   -0.126])
-        signif_nll_true_fit_hist.append(np.sqrt(q0_nll_true_fit))
+        # Set up binned model for 100 GeV
+        true_sig_bc_100GeV = []
+        for k in range(len(be_100GeV)-1):
+            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
+                                          be_100GeV[k], be_100GeV[k+1])
+            true_sig_bc_100GeV.append(true_sig)
 
-        q0_bb_true = generate_q0_via_bins(mc_bg_sig, be_hybrid, true_bg_bc, true_sig_bc)
-        signif_bb_true_hist.append(np.sqrt(q0_bb_true))
+        lm_binned_100GeV = lm_binned_wrapper(np.asarray(true_bg_bc_100GeV),
+                                             np.asarray(true_sig_bc_100GeV))
+        binned_model_100GeV = Model(lm_binned_100GeV)
+        binned_params_100GeV = binned_model_100GeV.make_params()
+        binned_params_100GeV['ntot'].value   = n_bg
+        binned_params_100GeV['ntot'].vary    = False
+        binned_params_100GeV['A'].value      = 0.1
+        binned_params_100GeV['A'].min        = 0
+        binned_params_100GeV['A'].max        = 1
 
-        q0_bb_shape = generate_q0_via_shape_fit(mc_bg_sig, be_hybrid, binned_model, binned_params)
-        signif_bb_shape_hist.append(np.sqrt(q0_bb_shape))
-
-        q0_1GeV_true = generate_q0_via_bins(mc_bg_sig, be_1GeV, true_bg_bc_1GeV, true_sig_bc_1GeV)
-        signif_1GeV_true_hist.append(np.sqrt(q0_1GeV_true))
-
-        q0_2GeV_true = generate_q0_via_bins(mc_bg_sig, be_2GeV, true_bg_bc_2GeV, true_sig_bc_2GeV)
-        signif_2GeV_true_hist.append(np.sqrt(q0_2GeV_true))
-
-        q0_5GeV_true = generate_q0_via_bins(mc_bg_sig, be_5GeV, true_bg_bc_5GeV, true_sig_bc_5GeV)
-        signif_5GeV_true_hist.append(np.sqrt(q0_5GeV_true))
-
-        q0_10GeV_true = generate_q0_via_bins(mc_bg_sig, be_10GeV,
-                                             true_bg_bc_10GeV, true_sig_bc_10GeV)
-        signif_10GeV_true_hist.append(np.sqrt(q0_10GeV_true))
+        for j in tqdm_notebook(xrange(200), desc='Toys', leave=False):
+            mc_bg = generate_toy_data(bg_result.x, n_bg)
+            uA = calc_A_unbinned(mc_bg, bg_sig_model, bg_result.x, sig_p)
+            unbinned_A[i].append(uA)
+            bA = calc_A_binned(mc_bg, be_bg, binned_model_bb, binned_params_bb)
+            binned_A[i].append(bA)
+            bA_100 = calc_A_binned(mc_bg, be_100GeV, binned_model_100GeV, binned_params_100GeV)
+            binned_A_100[i].append(bA_100)
