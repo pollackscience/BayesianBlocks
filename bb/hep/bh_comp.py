@@ -100,14 +100,13 @@ def generate_initial_params(data_bg_mul2, data_bg_mul8):
     bg_result = bg_fitter.fit([-1.80808e+01, -8.21174e-02, 8.06289e-01])
     n_bg = len(data_bg_mul8)
 
-    gRandom.SetSeed(111)
+    gRandom.SetSeed(222)
 
     # Set up bg sampling
     bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
     tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 2800, 13000, 3)
     tf1_bg_pdf.SetParameters(*bg_result.x)
     mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
-
 
     be_bg = bayesian_blocks(mc_bg, p0=0.02)
     be_bg = np.append(be_bg, [13000])
@@ -206,23 +205,30 @@ def calc_A_binned(data, bin_edges, binned_model, params):
     return A_scan
 
 
-def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='bh_vis_ex'):
+def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='bh_vis_ex',
+                   do_ratio=False):
     xlims = (be[0], be[-1])
     ratlims = (0, 6)
 
     bin_centers = (be[1:]+be[:-1])/2
 
-    fig = plt.figure()
-    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
-    ax1 = fig.add_subplot(gs[0])
-    ax1.set_yscale("log", nonposy='clip')
-    ax2 = fig.add_subplot(gs[1], sharex=ax1)
-    ax1.grid(True)
-    ax2.grid(True)
-    # ax2.set_yscale("log", nonposy='clip')
-    plt.setp(ax1.get_xticklabels(), visible=False)
-    fig.subplots_adjust(hspace=0.001)
-    ax1.set_xlim(xlims)
+    if do_ratio:
+        fig = plt.figure()
+        gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
+        ax1 = fig.add_subplot(gs[0])
+        ax1.set_yscale("log", nonposy='clip')
+        ax2 = fig.add_subplot(gs[1], sharex=ax1)
+        ax1.grid(True)
+        ax2.grid(True)
+        # ax2.set_yscale("log", nonposy='clip')
+        plt.setp(ax1.get_xticklabels(), visible=False)
+        fig.subplots_adjust(hspace=0.001)
+        ax1.set_xlim(xlims)
+    else:
+        fig, ax1 = plt.subplots()
+        ax1.set_yscale("log", nonposy='clip')
+        ax1.grid(True)
+        ax1.set_xlim(xlims)
 
     # print 'lims'
     bc_d, _ = np.histogram(data, bins=be)
@@ -233,20 +239,21 @@ def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='b
     hist(mc, ax=ax1, bins=be, scale='binwidth', weights=[len(data)/(len(mc))]*(len(mc)),
          histtype='stepfilled', alpha=0.2, label='Sim Background')
     ax1.legend()
-    ratio = bc_d/bc_mc
-    ratio_err = np.sqrt(bc_d)/bc_mc
-    fill_between_steps(ax2, be, ratio+ratio_err, ratio-ratio_err, alpha=0.2, step_where='pre',
-                       linewidth=0, color='red')
-    ax2.errorbar(bin_centers, ratio, yerr=None, xerr=[np.abs(be[0:-1]-bin_centers),
-                                                      np.abs(be[1:]-bin_centers)], fmt='ok')
-    ax2.set_xlabel(r'$S_T$ (GeV)', fontsize=17)
-    ax2.set_ylabel('Data/BG', fontsize=17)
-    ax1.set_ylabel(r'N/$\Delta$x', fontsize=17)
-    ax2.get_yaxis().get_major_formatter().set_useOffset(False)
-    ax2.axhline(1, linewidth=2, color='r')
-    ax2.yaxis.set_major_locator(MaxNLocator(nbins=7, prune='upper'))
-    ax2.set_ylim(ratlims)
+    if do_ratio:
+        ratio = bc_d/bc_mc
+        ratio_err = np.sqrt(bc_d)/bc_mc
+        fill_between_steps(ax2, be, ratio+ratio_err, ratio-ratio_err, alpha=0.2, step_where='pre',
+                           linewidth=0, color='red')
+        ax2.errorbar(bin_centers, ratio, yerr=None, xerr=[np.abs(be[0:-1]-bin_centers),
+                                                          np.abs(be[1:]-bin_centers)], fmt='ok')
+        ax2.set_xlabel(r'$S_T$ (GeV)', fontsize=17)
+        ax2.set_ylabel('Data/BG', fontsize=17)
+        ax2.get_yaxis().get_major_formatter().set_useOffset(False)
+        ax2.axhline(1, linewidth=2, color='r')
+        ax2.yaxis.set_major_locator(MaxNLocator(nbins=7, prune='upper'))
+        ax2.set_ylim(ratlims)
 
+    ax1.set_ylabel(r'N/$\Delta$x', fontsize=17)
     ax1.set_title(title)
     plt.savefig('figures/{}.pdf'.format(save_name))
     plt.savefig('figures/{}.png'.format(save_name))
