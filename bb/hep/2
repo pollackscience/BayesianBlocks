@@ -25,13 +25,9 @@ from numba import jit
 
 def lm_binned_wrapper(mu_bg, mu_sig):
     @jit
-    def proper_means(ix, A, ntot):
-        pm = (((1-A)*mu_bg+A*mu_sig)/np.sum((1-A)*mu_bg+A*mu_sig))*ntot
-        return pm
-
     def lm_binned(ix, A, ntot):
-        pm = proper_means(ix, A, ntot)
-        return pm[ix]
+        proper_means = (((1-A)*mu_bg+A*mu_sig)/np.sum((1-A)*mu_bg+A*mu_sig))*ntot
+        return proper_means[ix]
     return lm_binned
 
 
@@ -49,13 +45,13 @@ def bg_pdf_simp(x, a, doROOT=False):
 
 
 # def bg_pdf_helper(x, a0, a2):
-@jit
+#@jit
 def bg_pdf_helper(x, a0, a1, a2):
     return ((1+x)**a0)/(x**(a1+a2*np.log(x)))
     # return ((1+x)**a0)/(x**(a2*np.log(x)))
 
 
-@jit
+#@jit
 def bg_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
     '''BG parameterization from BH analysis:
     f(x)=((1+x)^alpha)/(x^(beta+gamma*ln(x)))
@@ -69,8 +65,7 @@ def bg_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
 
     func = functools.partial(bg_pdf_helper, a0=a[0], a1=a[1], a2=a[2])
     # func = functools.partial(bg_pdf_helper, a0=a[0], a2=a[1])
-    # print x, a
-    return func(x)/max(integrate.quad(func, 2800, 13000)[0], 1e-200)
+    return func(x)/integrate.quad(func, 2800, 13000)[0]
 
 
 @jit
@@ -105,7 +100,7 @@ def generate_initial_params(data_bg_mul2, data_bg_mul8):
 
     # fit to the data distributions
     bg_model = ff.Model(bg_pdf, ['alpha', 'beta', 'gamma'])
-    bg_model.set_bounds([(1e-20, 20), (-10, -1e-20), (1e-20, 10)])
+    bg_model.set_bounds([(-200, 200), (-100, 100), (-100, 100)])
     bg_fitter = ff.NLLFitter(bg_model, data_bg_mul2)
     bg_result = bg_fitter.fit([-1.80808e+01, -8.21174e-02, 8.06289e-01])
     n_bg = len(data_bg_mul8)

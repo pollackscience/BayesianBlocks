@@ -319,17 +319,20 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
     return q0
 
 
-def generate_q0_via_nll_unbinned_constrained(bg, data):
+def generate_q0_via_nll_unbinned_constrained(bg, data, bg_params):
     '''Perform two nll fits to data, one for bg+signal, one for bg-only.
     Use these values to create the q0 statistic.'''
 
     data = np.asarray(data)
     bg = np.asarray(bg)
     bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-    bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+    #bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+    bg_model.set_bounds([(bg_params[0], bg_params[0]), (bg_params[1], bg_params[1]), (bg_params[2],
+                                                                                      bg_params[2])])
 
     mc_bg_only_fitter = ff.NLLFitter(bg_model, bg, verbose=False)
-    mc_bg_only_result = mc_bg_only_fitter.fit([-0.963, 0.366, -0.091], calculate_corr=False)
+    #mc_bg_only_result = mc_bg_only_fitter.fit([-0.963, 0.366, -0.091], calculate_corr=False)
+    mc_bg_only_result = mc_bg_only_fitter.fit([bg_params[0], bg_params[1], bg_params[2]], calculate_corr=False)
     bg_ps = mc_bg_only_result.x
     bg_nll = bg_model.nll(data, bg_ps)
 
@@ -477,7 +480,7 @@ if __name__ == "__main__":
         q0_nll_fit = generate_q0_via_nll_unbinned(mc_bg_sig)
         signif_nll_fit_hist.append(np.sqrt(q0_nll_fit))
 
-        q0_nll_constrained = generate_q0_via_nll_unbinned_constrained(mc_bg, mc_bg_sig)
+        q0_nll_constrained = generate_q0_via_nll_unbinned_constrained(mc_bg, mc_bg_sig, bg_result.x)
         signif_nll_constrained_hist.append(np.sqrt(q0_nll_constrained))
 
         q0_nll_true = generate_q0_via_nll_unbinned(mc_bg_sig, bg_params=[-0.957, 0.399, -0.126],
