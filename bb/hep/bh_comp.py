@@ -11,7 +11,6 @@ import cPickle as pkl
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
-from lmfit import Model
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
 from bb.tools.hist_tools_modified import hist
 import nllfitter.future_fitter as ff
@@ -24,15 +23,52 @@ from numba import jit
 
 
 def lm_binned_wrapper(mu_bg, mu_sig):
-    @jit
-    def proper_means(ix, A, ntot):
-        pm = (((1-A)*mu_bg+A*mu_sig)/np.sum((1-A)*mu_bg+A*mu_sig))*ntot
-        return pm
+    # @jit
+    # def proper_means(ix, A, ntot):
+    #     pm = (((1-A)*mu_bg+A*mu_sig)/np.sum((1-A)*mu_bg+A*mu_sig))*ntot
+    #     return pm
 
     def lm_binned(ix, A, ntot):
-        pm = proper_means(ix, A, ntot)
+        # pm = proper_means(ix, A, ntot)
+        pm = (((1-A)*mu_bg+A*mu_sig)/np.sum((1-A)*mu_bg+A*mu_sig))*ntot
         return pm[ix]
     return lm_binned
+
+
+def template_pdf_wrapper(mu_bg, mu_sig):
+    '''Wrapper function to produce a pmf of poisson variables based on a bg+signal mixture model.
+    Input means are automatically normalized.
+
+    mu_bg:  Collection of expected background yields for all bins.
+    mu_sig: Collection of expected signal yields for all bins.
+
+    mu_bg and mu_sig must be the same length.'''
+
+    if len(mu_bg) != len(mu_sig):
+        raise Exception('mu_bg must be the same length as mu_sig!')
+
+    mu_bg = np.asarray(mu_bg)
+    mu_bg = mu_bg/float(np.sum(mu_bg))
+    mu_sig = np.asarray(mu_sig)
+    mu_sig = mu_sig/float(np.sum(mu_sig))
+
+    def template_pdf(x, a):
+        '''Binned template pdf for simple mixture model.
+
+        x:      bin content of data histogram
+        a[0]:   signal amplitude
+        a[1]:   total number of events (should be fixed).
+
+        x must be the same length as mu_bg (and mu_sig).'''
+
+        if len(x) != len(mu_bg):
+            raise Exception('x must be the same length as mu_bg!')
+
+        means = ((1-a[0])*mu_bg+a[0]*mu_sig)*a[1]
+        pdf = poisson.pmf(x, means)
+        return pdf
+
+    return template_pdf
 
 
 def bg_pdf_simp(x, a, doROOT=False):
@@ -180,30 +216,34 @@ def calc_A_unbinned(data, model, bg_params, sig_params):
     return scan_res.x[0]
 
 
-def calc_A_binned(data, bin_edges, binned_model, params):
+def calc_A_binned(data, bg_mu, sig_mu):
     '''Given input data and the true template, calculate the 95% UL for binned data
     data.  The bg and signal templates are held fixed.  The best-fit A value is determined first,
     then the 95% UL is determined by scanning for the correct value of A that leads to a p-value of
     0.05.  This procedure must be run many times and averaged to get the mean UL value and error
     bands.'''
 
-    bc, bin_edges = np.histogram(data, bin_edges, range=(2800, 13000))
-    ibc = np.asarray(range(len(bc)))
-    result = binned_model.fit(bc, ix=ibc, params=params)
-    # plt.plot(ibc, bc,         'bo')
-    # plt.plot(ibc, result.best_fit, 'r-')
-    # plt.show()
-    # raw_input()
-    nll_mle = -np.sum(np.log(poisson.pmf(bc, result.best_fit)))
+    # Set up the models and pdfs, given the true means
+    n_tot = np.sum(data)
+    template_pdf = template_pdf_wrapper(bg_mu, sig_mu)
+    template_model = ff.Model(template_pdf, ['A', 'ntot'])
+    template_model.set_bounds([(0, 1), (n_tot, n_tot)])
 
+    # Obtain the best fit value for A
+    template_fitter = ff.NLLFitter(template_model, data, verbose=False)
+    mle_res = template_fitter.fit([0.1, n_tot], calculate_corr=False)
+
+    # Now scan through A values to find the one that leads to a p-value of 0.05
     pval = -1
     right = 1
-    left = result.params['A'].value
+    left = mle_res.x[0]
     A_scan = 0.5*(left+right)
     while not np.isclose(pval, 0.05, 0.0001, 0.0001):
+        template_model.set_bounds([(A_scan*(1-1e-8), A_scan*(1+1e-8)), (n_tot, n_tot)])
+        scan_fitter = ff.NLLFitter(template_model, np.asarray(data), verbose=False)
+        scan_res = scan_fitter.fit([A_scan, n_tot], calculate_corr=False)
         # find pval
-        nll_scan = -np.sum(np.log(poisson.pmf(bc, result.eval(A=A_scan))))
-        qu = 2*max(nll_scan-nll_mle, 0)
+        qu = 2*max(scan_res.fun-mle_res.fun, 0)
         pval = 1-norm.cdf(qu)
         if pval < 0.05:
             right = A_scan
@@ -212,7 +252,7 @@ def calc_A_binned(data, bin_edges, binned_model, params):
             left = A_scan
             A_scan = 0.5*(right+left)
 
-    return A_scan
+    return scan_res.x[0]
 
 
 def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='bh_vis_ex',
@@ -324,15 +364,6 @@ if __name__ == "__main__":
                                           be_bg[k], be_bg[k+1])
             true_sig_bc_bb.append(true_sig)
 
-        lm_binned_bb = lm_binned_wrapper(np.asarray(true_bg_bc_bb), np.asarray(true_sig_bc_bb))
-        binned_model_bb = Model(lm_binned_bb)
-        binned_params_bb = binned_model_bb.make_params()
-        binned_params_bb['ntot'].value   = n_bg
-        binned_params_bb['ntot'].vary    = False
-        binned_params_bb['A'].value      = 0.1
-        binned_params_bb['A'].min        = 0
-        binned_params_bb['A'].max        = 1
-
         # Set up binned model for 100 GeV
         true_sig_bc_100GeV = []
         for k in range(len(be_100GeV)-1):
@@ -340,21 +371,14 @@ if __name__ == "__main__":
                                           be_100GeV[k], be_100GeV[k+1])
             true_sig_bc_100GeV.append(true_sig)
 
-        lm_binned_100GeV = lm_binned_wrapper(np.asarray(true_bg_bc_100GeV),
-                                             np.asarray(true_sig_bc_100GeV))
-        binned_model_100GeV = Model(lm_binned_100GeV)
-        binned_params_100GeV = binned_model_100GeV.make_params()
-        binned_params_100GeV['ntot'].value   = n_bg
-        binned_params_100GeV['ntot'].vary    = False
-        binned_params_100GeV['A'].value      = 0.1
-        binned_params_100GeV['A'].min        = 0
-        binned_params_100GeV['A'].max        = 1
-
         for j in tqdm_notebook(xrange(200), desc='Toys', leave=False):
             mc_bg = generate_toy_data(bg_result.x, n_bg)
+
             uA = calc_A_unbinned(mc_bg, bg_sig_model, bg_result.x, sig_p)
             unbinned_A[i].append(uA)
-            bA = calc_A_binned(mc_bg, be_bg, binned_model_bb, binned_params_bb)
+            bc_bb, _ = np.histogram(mc_bg, bins=be_bg)
+            bA = calc_A_binned(bc_bb, true_bg_bc_bb, true_sig_bc_bb)
             binned_A[i].append(bA)
-            bA_100 = calc_A_binned(mc_bg, be_100GeV, binned_model_100GeV, binned_params_100GeV)
+            bc_100, _ = np.histogram(mc_bg, bins=be_100GeV)
+            bA_100 = calc_A_binned(bc_100, true_bg_bc_100GeV, true_sig_bc_100GeV)
             binned_A_100[i].append(bA_100)
