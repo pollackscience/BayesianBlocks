@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib import gridspec
 from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
-from bb.tools.hist_tools_modified import hist
+from bb.tools.hist_tools_modified import hist, poisson_error
 from bb.tools.fill_between_steps import fill_between_steps
 
 
@@ -16,20 +16,22 @@ def fancy_plots(bin_style='bb'):
     current_dir = os.path.dirname(__file__)
     bb_dir = os.path.join(current_dir, '../..')
     xlims = (50, 140)
-    ratlims = (0, 3)
+    ratlims = (0, 2.5)
     n_events = 10000
 
     z_data = pkl.load(open(bb_dir+'/files/DY/ZLL_v2.p', "rb"))
     z_data = z_data.query('50<Mll<140')
+    data_shifted = z_data[0:n_events].Mll*1.01
+    mc_nominal = z_data[n_events:].Mll
 
     if bin_style == 'bb':
-        be = bayesian_blocks(z_data[0:n_events].Mll, p0=0.01)
+        be = bayesian_blocks(data_shifted, p0=0.01)
         be[0] = xlims[0]
         be[-1] = xlims[1]
         bin_centers = (be[1:]+be[:-1])/2
         print len(bin_centers)
     else:
-        _, be = np.histogram(z_data[0:n_events].Mll, 20, range=xlims)
+        _, be = np.histogram(data_shifted, 20, range=xlims)
         bin_centers = (be[1:]+be[:-1])/2
 
     fig = plt.figure()
@@ -45,19 +47,23 @@ def fancy_plots(bin_style='bb'):
 
     print 'lims'
     print z_data.Mll.min(), z_data.Mll.max()
-    bc_d, _, _  = hist(z_data[0:n_events].Mll*1.01, ax=ax1, bins=be, scale='binwidth',
-                       histtype='marker', markersize=10, color='k', errorbars=True, label='Shifted')
+    bc_d_bw, _, _  = hist(data_shifted, ax=ax1, bins=be, scale='binwidth', histtype='marker',
+                          markersize=10, color='k', errorbars=True, label='Shifted')
 
-    bc_mc, _, _ = hist(z_data[n_events:].Mll, ax=ax1, bins=be, scale='binwidth',
-                       weights=[n_events/(len(z_data)-n_events)]*(len(z_data)-n_events),
-                       histtype='stepfilled', alpha=0.2, label='Nominal')
+    bc_mc_bw, _, _ = hist(mc_nominal, ax=ax1, bins=be, scale='binwidth',
+                          weights=[n_events/(len(z_data)-n_events)]*(len(z_data)-n_events),
+                          histtype='stepfilled', alpha=0.2, label='Nominal')
     # bc_mc, _, _ = hist(z_data.Mll_gen, ax=ax1, bins=be, scale='binwidth',
     #                    weights=[n_events/len(z_data)]*len(z_data),
     #                    histtype='stepfilled', alpha=0.2, label='Gen')
     ax1.legend()
-    ratio = bc_d/bc_mc
-    ratio_err = np.sqrt(bc_d)/bc_mc
-    fill_between_steps(ax2, be, ratio+ratio_err, ratio-ratio_err, alpha=0.2, step_where='pre',
+    bc_d_true, _ = np.histogram(data_shifted, bins=be)
+    bc_mc_true, _ = np.histogram(mc_nominal, bins=be,
+                                 weights=[n_events/(len(z_data)-n_events)]*(len(z_data)-n_events))
+    ratio = bc_d_true/bc_mc_true
+    ratio_err_up = [poisson_error(i)[1] for i in bc_d_true]/bc_mc_true
+    ratio_err_down = [poisson_error(i)[0] for i in bc_d_true]/bc_mc_true
+    fill_between_steps(ax2, be, ratio+ratio_err_up, ratio-ratio_err_down, alpha=0.2, step_where='pre',
                        linewidth=0, color='red')
     ax2.errorbar(bin_centers, ratio, yerr=None, xerr=[np.abs(be[0:-1]-bin_centers),
                                                       np.abs(be[1:]-bin_centers)], fmt='ok')
@@ -66,7 +72,7 @@ def fancy_plots(bin_style='bb'):
     ax1.set_ylabel(r'N/$\Delta$x', fontsize=17)
     ax2.get_yaxis().get_major_formatter().set_useOffset(False)
     ax2.axhline(1, linewidth=2, color='r')
-    ax2.yaxis.set_major_locator(MaxNLocator(nbins=7, prune='upper'))
+    ax2.yaxis.set_major_locator(MaxNLocator(nbins=6, prune='upper'))
     ax2.set_ylim(ratlims)
     if bin_style == 'bb':
         ax1.set_title('Dimuon Mass Distribution, Bayesian Blocks')
@@ -83,11 +89,11 @@ def fancy_plots_pt(bin_style='bb'):
     current_dir = os.path.dirname(__file__)
     bb_dir = os.path.join(current_dir, '../..')
     pt_data = pkl.load(open(bb_dir+'/files/DY/ZLL_Jet1.p', "rb"))
-    pt_data = pt_data.query('0<leading_jet_pT').reset_index().ix[0:9000]
-    pt_mc = pkl.load(open(bb_dir+'/files/DY/ZLL_Jet2.p', "rb"))
-    pt_mc = pt_mc.query('0<leading_jet_pT')
+    pt_data = pt_data.query('0<leading_jet_pT<800').reset_index().ix[0:9000]
+    pt_mc = pkl.load(open(bb_dir+'/files/DY/ZLL_Jet3.p', "rb"))
+    pt_mc = pt_mc.query('0<leading_jet_pT<800')
     xlims = (pt_data.leading_jet_pT.min(), pt_data.leading_jet_pT.max())
-    ratlims = (0, 3)
+    ratlims = (0, 2.5)
     n_events = len(pt_data)
 
 
@@ -114,10 +120,11 @@ def fancy_plots_pt(bin_style='bb'):
     plt.setp(ax1.get_xticklabels(), visible=False)
     fig.subplots_adjust(hspace=0.001)
     ax1.set_xlim(xlims)
+    # ax1.set_ylim(ymin=1e-6, ymax=1e3)
 
     print 'lims'
     print pt_data.leading_jet_pT.min(), pt_data.leading_jet_pT.max()
-    bc_d, _, _  = hist(pt_data.leading_jet_pT*1.0, ax=ax1, bins=be, scale='binwidth',
+    bc_d, _, _  = hist(pt_data.leading_jet_pT, ax=ax1, bins=be, scale='binwidth',
                        histtype='marker', markersize=10, color='k', errorbars=True, label='Data')
 
     bc_mc, _, _ = hist(pt_mc.leading_jet_pT, ax=ax1, bins=be, scale='binwidth',
@@ -127,9 +134,13 @@ def fancy_plots_pt(bin_style='bb'):
     #                    weights=[n_events/len(z_data)]*len(z_data),
     #                    histtype='stepfilled', alpha=0.2, label='Gen')
     ax1.legend()
-    ratio = bc_d/bc_mc
-    ratio_err = np.sqrt(bc_d)/bc_mc
-    fill_between_steps(ax2, be, ratio+ratio_err, ratio-ratio_err, alpha=0.2, step_where='pre',
+    bc_d_true, _ = np.histogram(pt_data.leading_jet_pT, bins=be)
+    bc_mc_true, _ = np.histogram(pt_mc.leading_jet_pT, bins=be,
+                                 weights=[n_events/len(pt_mc)]*(len(pt_mc)))
+    ratio = bc_d_true/bc_mc_true
+    ratio_err_up = [poisson_error(i)[1] for i in bc_d_true]/bc_mc_true
+    ratio_err_down = [poisson_error(i)[0] for i in bc_d_true]/bc_mc_true
+    fill_between_steps(ax2, be, ratio+ratio_err_up, ratio-ratio_err_down, alpha=0.2, step_where='pre',
                        linewidth=0, color='red')
     ax2.errorbar(bin_centers, ratio, yerr=None, xerr=[np.abs(be[0:-1]-bin_centers),
                                                       np.abs(be[1:]-bin_centers)], fmt='ok')
@@ -138,7 +149,7 @@ def fancy_plots_pt(bin_style='bb'):
     ax1.set_ylabel(r'N/$\Delta$x', fontsize=17)
     ax2.get_yaxis().get_major_formatter().set_useOffset(False)
     ax2.axhline(1, linewidth=2, color='r')
-    ax2.yaxis.set_major_locator(MaxNLocator(nbins=7, prune='upper'))
+    ax2.yaxis.set_major_locator(MaxNLocator(nbins=6, prune='upper'))
     ax2.set_ylim(ratlims)
     if bin_style == 'bb':
         ax1.set_title('Leading Jet Distribution, Bayesian Blocks')
@@ -150,6 +161,7 @@ def fancy_plots_pt(bin_style='bb'):
         plt.savefig('figures/b25_Jet_comp.png')
 
     plt.show()
+    return pt_data, pt_mc
 
 
 def simple_binning():
@@ -171,7 +183,7 @@ def simple_binning():
 if __name__ == "__main__":
     # simple_binning()
     plt.close('all')
-    #fancy_plots(25)
-    #fancy_plots('bb')
-    fancy_plots_pt(25)
+    fancy_plots(25)
+    fancy_plots('bb')
+    pt_data, pt_mc = fancy_plots_pt(25)
     fancy_plots_pt('bb')
