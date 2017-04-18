@@ -10,12 +10,12 @@ import scipy.integrate as integrate
 from scipy.stats import poisson
 import cPickle as pkl
 from matplotlib import pyplot as plt
-from lmfit import Model
+# from lmfit import Model
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
 import nllfitter.future_fitter as ff
 from ROOT import gRandom
 from ROOT import TF1
-from tqdm import tqdm
+from tqdm import tqdm_notebook
 
 
 def lm_binned_wrapper(mu_bg, mu_sig):
@@ -23,6 +23,43 @@ def lm_binned_wrapper(mu_bg, mu_sig):
         proper_means = ((mu_bg+A*mu_sig)/np.sum(mu_bg+A*mu_sig))*ntot
         return proper_means[ix]
     return lm_binned
+
+
+def template_pdf_wrapper(mu_bg, mu_sig, cnc=False):
+    '''Wrapper function to produce a pmf of poisson variables based on a bg+signal mixture model.
+    Input means are automatically normalized.
+
+    mu_bg:  Collection of expected background yields for all bins.
+    mu_sig: Collection of expected signal yields for all bins.
+
+    mu_bg and mu_sig must be the same length.'''
+
+    if len(mu_bg) != len(mu_sig):
+        raise Exception('mu_bg must be the same length as mu_sig!')
+
+    mu_bg = np.asarray(mu_bg)
+    mu_sig = np.asarray(mu_sig)
+    if not cnc:
+        mu_bg = mu_bg/float(np.sum(mu_bg))
+        mu_sig = mu_sig/float(np.sum(mu_sig))
+
+    def template_pdf(x, a):
+        '''Binned template pdf for simple mixture model.
+
+        x:      bin content of data histogram
+        a[0]:   signal amplitude
+        a[1]:   total number of events (should be fixed).
+
+        x must be the same length as mu_bg (and mu_sig).'''
+
+        if len(x) != len(mu_bg):
+            raise Exception('x must be the same length as mu_bg!')
+
+        means = ((1-a[0])*mu_bg+a[0]*mu_sig)*a[1]
+        pdf = poisson.pmf(x, means)
+        return pdf
+
+    return template_pdf
 
 
 def bg_pdf(x, a, xlow=100, xhigh=180, doROOT=False):
@@ -249,18 +286,11 @@ def generate_initial_params(hgg_bg, hgg_signal, n_sigma):
     return bg_result, sig_result, n_bg, n_sig, be_bg, be_sig
 
 
-def generate_toy_data(bg_params, sig_params, n_bg, n_sig, seed=None):
+def generate_toy_data(bg_pdf_ROOT, sig_pdf_ROOT, n_bg, n_sig, seed=None):
     '''use bg and signal params to generated simulated data'''
     # bg dist
-    bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
-    tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 100, 180, 3)
-    tf1_bg_pdf.SetParameters(*bg_params)
-    # signal dist
-    sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
-    tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 100, 180, 2)
-    tf1_sig_pdf.SetParameters(*sig_params)
-    mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
-    mc_sig = [tf1_sig_pdf.GetRandom() for i in xrange(n_sig)]
+    mc_bg = [bg_pdf_ROOT.GetRandom() for i in xrange(n_bg)]
+    mc_sig = [sig_pdf_ROOT.GetRandom() for i in xrange(n_sig)]
     return mc_bg, mc_sig
 
 
@@ -326,13 +356,14 @@ def generate_q0_via_nll_unbinned_constrained(bg, data, bg_params):
     data = np.asarray(data)
     bg = np.asarray(bg)
     bg_model = ff.Model(bg_pdf, ['a1', 'a2', 'a3'])
-    #bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
-    bg_model.set_bounds([(bg_params[0], bg_params[0]), (bg_params[1], bg_params[1]), (bg_params[2],
-                                                                                      bg_params[2])])
+    # bg_model.set_bounds([(-1., 1.), (-1., 1.), (-1., 1.)])
+    bg_model.set_bounds([(bg_params[0], bg_params[0]),
+                         (bg_params[1], bg_params[1]), (bg_params[2], bg_params[2])])
 
     mc_bg_only_fitter = ff.NLLFitter(bg_model, bg, verbose=False)
-    #mc_bg_only_result = mc_bg_only_fitter.fit([-0.963, 0.366, -0.091], calculate_corr=False)
-    mc_bg_only_result = mc_bg_only_fitter.fit([bg_params[0], bg_params[1], bg_params[2]], calculate_corr=False)
+    # mc_bg_only_result = mc_bg_only_fitter.fit([-0.963, 0.366, -0.091], calculate_corr=False)
+    mc_bg_only_result = mc_bg_only_fitter.fit([bg_params[0], bg_params[1], bg_params[2]],
+                                              calculate_corr=False)
     bg_ps = mc_bg_only_result.x
     bg_nll = bg_model.nll(data, bg_ps)
 
@@ -366,17 +397,29 @@ def generate_q0_via_bins(data, bin_edges, true_bg_bc, true_sig_bc):
     return q0
 
 
-def generate_q0_via_shape_fit(data, bin_edges, binned_model, binned_params):
+# def generate_q0_via_shape_fit(data, bin_edges, binned_model, binned_params):
+def generate_q0_via_shape_fit(data, bin_edges, template_model):
     '''Generate likelihood ratios based on a template fit to the data.
     Shape values for bg and signal are determined from integration of
     underlying pdfs used to generate toys.
     Use these values to create the q0 statistic.'''
 
+    n_tot = len(data)
     bc, bin_edges = np.histogram(data, bin_edges, range=(100, 180))
-    ibc = np.asarray(range(len(bc)))
-    result = binned_model.fit(bc, ix=ibc, params=binned_params)
-    nll_bg = -np.sum(np.log(poisson.pmf(bc, result.eval(A=0))))
-    nll_sig = -np.sum(np.log(poisson.pmf(bc, result.best_fit)))
+    template_model.set_bounds([(0, 1), (n_tot, n_tot)])
+    template_fitter = ff.NLLFitter(template_model, bc, verbose=False)
+    mle_res = template_fitter.fit([0.1, n_tot], calculate_corr=False)
+    nll_sig = mle_res.fun
+
+    template_model.set_bounds([(0, 0), (n_tot, n_tot)])
+    template_fitter = ff.NLLFitter(template_model, bc, verbose=False)
+    bg_res = template_fitter.fit([0, n_tot], calculate_corr=False)
+    nll_bg = bg_res.fun
+
+    # ibc = np.asarray(range(len(bc)))
+    # result = binned_model.fit(bc, ix=ibc, params=binned_params)
+    # nll_bg = -np.sum(np.log(poisson.pmf(bc, result.eval(A=0))))
+    # nll_sig = -np.sum(np.log(poisson.pmf(bc, result.best_fit)))
 
     q0 = 2*(nll_bg-nll_sig)
     return q0
@@ -391,6 +434,18 @@ if __name__ == "__main__":
 
     bg_result, sig_result, n_bg, n_sig, be_bg, be_sig = generate_initial_params(
         hgg_bg, hgg_signal, 5)
+
+    # bg dist ROOT
+    bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
+    tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 100, 180, 3)
+    tf1_bg_pdf.SetParameters(*bg_result.x)
+
+    # signal dist
+    sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
+    tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 100, 180, 2)
+    tf1_sig_pdf.SetParameters(*sig_result.x)
+
+    n_tot = n_bg + n_sig
     be_hybrid = np.concatenate([be_bg[be_bg < be_sig[0]-1.5],
                                 be_sig,
                                 be_bg[be_bg > be_sig[-1]+1.5]])
@@ -410,14 +465,17 @@ if __name__ == "__main__":
                                       be_hybrid[i], be_hybrid[i+1])
         true_sig_bc.append(true_sig*n_sig)
 
-    lm_binned = lm_binned_wrapper(np.asarray(true_bg_bc), np.asarray(true_sig_bc))
-    binned_model = Model(lm_binned)
-    binned_params = binned_model.make_params()
-    binned_params['ntot'].value   = n_bg+n_sig
-    binned_params['ntot'].vary    = False
-    binned_params['A'].value      = 0.1
-    binned_params['A'].min        = 0
-    binned_params['A'].max        = 1000
+    template_pdf = template_pdf_wrapper(true_bg_bc, true_sig_bc)
+    template_model = ff.Model(template_pdf, ['A', 'ntot'])
+    template_model.set_bounds([(0, 1), (n_tot, n_tot)])
+    # lm_binned = lm_binned_wrapper(np.asarray(true_bg_bc), np.asarray(true_sig_bc))
+    # binned_model = Model(lm_binned)
+    # binned_params = binned_model.make_params()
+    # binned_params['ntot'].value   = n_bg+n_sig
+    # binned_params['ntot'].vary    = False
+    # binned_params['A'].value      = 0.1
+    # binned_params['A'].min        = 0
+    # binned_params['A'].max        = 1000
 
     true_bg_bc_1GeV  = []
     true_sig_bc_1GeV = []
@@ -473,8 +531,8 @@ if __name__ == "__main__":
     # Do a bunch of toys
     gRandom.SetSeed(20)
 
-    for i in tqdm(range(500)):
-        mc_bg, mc_sig = generate_toy_data(bg_result.x, sig_result.x, n_bg, n_sig)
+    for i in tqdm_notebook(range(1000)):
+        mc_bg, mc_sig = generate_toy_data(tf1_bg_pdf, tf1_sig_pdf, n_bg, n_sig)
         mc_bg_sig = mc_bg+mc_sig
 
         q0_nll_fit = generate_q0_via_nll_unbinned(mc_bg_sig)
@@ -496,7 +554,7 @@ if __name__ == "__main__":
         q0_bb_true = generate_q0_via_bins(mc_bg_sig, be_hybrid, true_bg_bc, true_sig_bc)
         signif_bb_true_hist.append(np.sqrt(q0_bb_true))
 
-        q0_bb_shape = generate_q0_via_shape_fit(mc_bg_sig, be_hybrid, binned_model, binned_params)
+        q0_bb_shape = generate_q0_via_shape_fit(mc_bg_sig, be_hybrid, template_model)
         signif_bb_shape_hist.append(np.sqrt(q0_bb_shape))
 
         q0_1GeV_true = generate_q0_via_bins(mc_bg_sig, be_1GeV, true_bg_bc_1GeV, true_sig_bc_1GeV)
