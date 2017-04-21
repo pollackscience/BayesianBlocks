@@ -124,7 +124,7 @@ def bg_sig_pdf(x, a, xlow=2800, xhigh=13000, doROOT=False):
     return (1 - a[0])*bg_pdf(x, b, xlow=xlow, xhigh=xhigh) + a[0]*sig_pdf(x, c)
 
 
-def generate_initial_params(data_bg_mul2, data_bg_mul8):
+def generate_initial_params(data_bg_mul2, data_bg_mul8, seed=5):
 
     # fit to the data distributions
     bg_model = ff.Model(bg_pdf, ['alpha', 'beta', 'gamma'])
@@ -133,7 +133,7 @@ def generate_initial_params(data_bg_mul2, data_bg_mul8):
     bg_result = bg_fitter.fit([-1.80808e+01, -8.21174e-02, 8.06289e-01])
     n_bg = len(data_bg_mul8)
 
-    gRandom.SetSeed(13)
+    gRandom.SetSeed(seed)
 
     # Set up bg sampling
     bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
@@ -142,9 +142,10 @@ def generate_initial_params(data_bg_mul2, data_bg_mul8):
     mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
 
     be_bg = bayesian_blocks(mc_bg, p0=0.02)
+    be_bg[-1] += 0.1
     be_bg = np.append(be_bg, [13000])
     be_bg[0] = 2800
-    print be_bg
+    # print be_bg
     # hist(data_bg_mul8, bins=be_bg, scale='binwidth')
     # plt.show()
 
@@ -280,7 +281,7 @@ def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='b
     bc_d, _ = np.histogram(data, bins=be)
     bc_mc, _ = np.histogram(mc, bins=be, weights=[len(data)/(len(mc))]*(len(mc)))
     hist(data, ax=ax1, bins=be, scale='binwidth', histtype='marker', markersize=10, color='k',
-         errorbars=True, label='Sim Data')
+         errorbars=True, suppress_zero=True, label='Sim Data')
 
     hist(mc, ax=ax1, bins=be, scale='binwidth', weights=[len(data)/(len(mc))]*(len(mc)),
          histtype='stepfilled', alpha=0.2, label='Sim Background')
@@ -312,7 +313,17 @@ def bh_ratio_plots(data, mc, be, title='Black Hole Visual Example', save_name='b
     plt.show()
 
 
+def get_true_bin_content(be, pdf, params):
+    true_bc_list = []
+    for k in range(len(be)-1):
+        true_bc, _   = integrate.quad(functools.partial(pdf, a=params),
+                                      be[k], be[k+1])
+        true_bc_list.append(true_bc)
+    return true_bc_list
+
+
 if __name__ == "__main__":
+    seed = 11
     plt.close('all')
     bb_dir  = os.path.join(os.path.dirname(__file__), '../..')
     df_data_mul2 = pkl.load(open(bb_dir+'/files/BH/BH_test_data.p', 'rb'))
@@ -321,253 +332,120 @@ if __name__ == "__main__":
     df_data_mul8 = pkl.load(open(bb_dir+'/files/BH/BH_paper_data.p', 'rb'))
     data_bg_mul8 = df_data_mul8[df_data_mul8.ST_mul8_BB >= 2800].ST_mul8_BB.values
 
-    bg_result, n_bg, be_bg = generate_initial_params(data_bg_mul2, data_bg_mul8)
+    bg_result, n_bg, be_bg = generate_initial_params(data_bg_mul2, data_bg_mul8, seed)
     gen_toy = generate_toy_data_wrapper(bg_result.x)
 
-    true_bg_bc_50GeV  = []
-    true_bg_bc_100GeV  = []
-    true_bg_bc_200GeV  = []
-    true_bg_bc_400GeV  = []
-    true_bg_bc_1000GeV  = []
-    true_bg_bc_2000GeV  = []
-
-    true_bg_bc_bb  = []
-    for k in range(len(be_bg)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_bg[k], be_bg[k+1])
-        true_bg_bc_bb.append(true_bg)
-
-    # 50 GeV binning true BG
     be_50GeV = np.linspace(2800, 13000, 205)
-    for i in range(len(be_50GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_50GeV[i], be_50GeV[i+1])
-        true_bg_bc_50GeV.append(true_bg)
-
-    # 100 GeV binning true BG
     be_100GeV = np.linspace(2800, 13000, 103)
-    for i in range(len(be_100GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_100GeV[i], be_100GeV[i+1])
-        true_bg_bc_100GeV.append(true_bg)
-
-    # 200 GeV binning true BG
     be_200GeV = np.linspace(2800, 13000, 52)
-    for i in range(len(be_200GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_200GeV[i], be_200GeV[i+1])
-        true_bg_bc_200GeV.append(true_bg)
-
-    # 400 GeV binning true BG
     be_400GeV = np.linspace(2800, 13000, 26)
-    for i in range(len(be_400GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_400GeV[i], be_400GeV[i+1])
-        true_bg_bc_400GeV.append(true_bg)
-
-    # 1000 GeV binning true BG
     be_1000GeV = np.linspace(2800, 13000, 11)
-    for i in range(len(be_1000GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_1000GeV[i], be_1000GeV[i+1])
-        true_bg_bc_1000GeV.append(true_bg)
-
-    # 2000 GeV binning true BG
     be_2000GeV = np.linspace(2800, 13000, 6)
-    for i in range(len(be_2000GeV)-1):
-        true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                      be_2000GeV[i], be_2000GeV[i+1])
-        true_bg_bc_2000GeV.append(true_bg)
+
+    true_bg_bc_bb      = get_true_bin_content(be_bg, bg_pdf, bg_result.x)
+    true_bg_bc_50GeV   = get_true_bin_content(be_50GeV, bg_pdf, bg_result.x)
+    true_bg_bc_100GeV  = get_true_bin_content(be_100GeV, bg_pdf, bg_result.x)
+    true_bg_bc_200GeV  = get_true_bin_content(be_200GeV, bg_pdf, bg_result.x)
+    true_bg_bc_400GeV  = get_true_bin_content(be_400GeV, bg_pdf, bg_result.x)
+    true_bg_bc_1000GeV = get_true_bin_content(be_1000GeV, bg_pdf, bg_result.x)
+    true_bg_bc_2000GeV = get_true_bin_content(be_2000GeV, bg_pdf, bg_result.x)
 
     # Do a bunch of toys
-    gRandom.SetSeed(404)
+    gRandom.SetSeed(seed)
 
     bg_sig_model = ff.Model(bg_sig_pdf, ['C', 'mu', 'sigma', 'alpha', 'beta', 'gamma'])
     # sig_params = [(4000, 800), (5000, 1000), (6000, 1200), (7000, 1400)]
-    sig_params = [(4750, 970), (5350, 1070), (6000, 1200), (6600, 1300),
+    # sig_params = [(4750, 970), (5350, 1070), (6000, 1200), (6600, 1300),
+    #               (7150, 1440), (7800, 1500), (8380, 1660)]
+    sig_params = [(5350, 1070), (6000, 1200), (6600, 1300),
                   (7150, 1440), (7800, 1500), (8380, 1660)]
     # sig_params = [(7150, 1440)]
 
-    unbinned_A          = [[] for i in range(len(sig_params))]
     unbinned_A_mle      = [[] for i in range(len(sig_params))]
-    binned_A            = [[] for i in range(len(sig_params))]
     binned_A_mle        = [[] for i in range(len(sig_params))]
-    binned_A_hybrid     = [[] for i in range(len(sig_params))]
     binned_A_hybrid_mle = [[] for i in range(len(sig_params))]
-    binned_A_50         = [[] for i in range(len(sig_params))]
     binned_A_50_mle     = [[] for i in range(len(sig_params))]
-    binned_A_100        = [[] for i in range(len(sig_params))]
     binned_A_100_mle    = [[] for i in range(len(sig_params))]
-    binned_A_200        = [[] for i in range(len(sig_params))]
     binned_A_200_mle    = [[] for i in range(len(sig_params))]
-    binned_A_400        = [[] for i in range(len(sig_params))]
     binned_A_400_mle    = [[] for i in range(len(sig_params))]
-    binned_A_1000       = [[] for i in range(len(sig_params))]
     binned_A_1000_mle   = [[] for i in range(len(sig_params))]
-    binned_A_2000       = [[] for i in range(len(sig_params))]
     binned_A_2000_mle   = [[] for i in range(len(sig_params))]
-    cnc_A               = [[] for i in range(len(sig_params))]
     cnc_A_mle           = [[] for i in range(len(sig_params))]
 
     sig_pdf_ROOT = functools.partial(sig_pdf, doROOT=True)
     tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 2800, 13000, 2)
 
-    # mc_bg = generate_toy_data(bg_result.x, n_bg)
-    # res = calc_A_binned(mc_bg, be_bg, binned_model, binned_params)
-    # for i, sig_p in enumerate((sig_params)):
     for i, sig_p in enumerate(tqdm_notebook(sig_params, desc='Signal Model')):
 
-        # Calculate number of bg events in signal region for hybrid method
-        # sig_bound_low = sig_p[0] - np.sqrt(sig_p[1])*2.5
-        # sig_bound_hi = sig_p[0] + np.sqrt(sig_p[1])*2.5
-        # n_sig = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-        #                        sig_bound_low, sig_bound_hi)[0]*n_bg
-        # if n_sig < 10:
-        #     n_sig = 30
-        # else:
-        #     n_sig = int(np.sqrt(n_sig)*10)
         n_sig = n_bg
         tf1_sig_pdf.SetParameters(*sig_p)
         mc_sig = [tf1_sig_pdf.GetRandom() for ns in xrange(n_sig)]
         be_sig = bayesian_blocks(mc_sig, p0=0.02)
 
-        # Set up binned model for 50 GeV
-        true_sig_bc_50GeV = []
-        for k in range(len(be_50GeV)-1):
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_50GeV[k], be_50GeV[k+1])
-            true_sig_bc_50GeV.append(true_sig)
+        true_sig_bc_bb      = get_true_bin_content(be_bg, sig_pdf, sig_p)
+        true_sig_bc_50GeV   = get_true_bin_content(be_50GeV, sig_pdf, sig_p)
+        true_sig_bc_100GeV  = get_true_bin_content(be_100GeV, sig_pdf, sig_p)
+        true_sig_bc_200GeV  = get_true_bin_content(be_200GeV, sig_pdf, sig_p)
+        true_sig_bc_400GeV  = get_true_bin_content(be_400GeV, sig_pdf, sig_p)
+        true_sig_bc_1000GeV = get_true_bin_content(be_1000GeV, sig_pdf, sig_p)
+        true_sig_bc_2000GeV = get_true_bin_content(be_2000GeV, sig_pdf, sig_p)
 
-        # Set up binned model for 100 GeV
-        true_sig_bc_100GeV = []
-        for k in range(len(be_100GeV)-1):
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_100GeV[k], be_100GeV[k+1])
-            true_sig_bc_100GeV.append(true_sig)
+        be_hybrid = np.sort(np.unique(np.concatenate([be_bg, be_sig])))
 
-        # Set up binned model for 200 GeV
-        true_sig_bc_200GeV = []
-        for k in range(len(be_200GeV)-1):
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_200GeV[k], be_200GeV[k+1])
-            true_sig_bc_200GeV.append(true_sig)
-
-        # Set up binned model for 400 GeV
-        true_sig_bc_400GeV = []
-        for k in range(len(be_400GeV)-1):
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_400GeV[k], be_400GeV[k+1])
-            true_sig_bc_400GeV.append(true_sig)
-
-        # Set up binned model for 1000 GeV
-        true_sig_bc_1000GeV = []
-        for k in range(len(be_1000GeV)-1):
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_1000GeV[k], be_1000GeV[k+1])
-            true_sig_bc_1000GeV.append(true_sig)
-
-        # Set up binned model for 2000 GeV
-        true_sig_bc_2000GeV = []
-        for k in range(len(be_2000GeV)-1):
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_2000GeV[k], be_2000GeV[k+1])
-            true_sig_bc_2000GeV.append(true_sig)
-
-        # Set up binned model for BB
-        true_sig_bc_bb = []
-        for k in range(len(be_bg)-1):
-            # true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-            #                               be_bg[k], be_bg[k+1])
-            # true_bg_bc_bb.append(true_bg)
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_bg[k], be_bg[k+1])
-            true_sig_bc_bb.append(true_sig)
-
-        # Set up binned model for BB Hybrid
-        # (must do bg and signal, as they both change due to signal model)
-        # be_hybrid = np.concatenate([be_bg[be_bg < be_sig[0]-20],
-        #                             be_sig,
-        #                             be_bg[be_bg > be_sig[-1]+20]])
-        be_hybrid = np.sort(np.concatenate([be_bg, be_sig]))
-        true_bg_bc_bb_hybrid = []
-        true_sig_bc_bb_hybrid = []
-        for k in range(len(be_hybrid)-1):
-            true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-                                          be_hybrid[k], be_hybrid[k+1])
-            true_bg_bc_bb_hybrid.append(true_bg)
-            true_sig, _  = integrate.quad(functools.partial(sig_pdf, a=sig_p),
-                                          be_hybrid[k], be_hybrid[k+1])
-            true_sig_bc_bb_hybrid.append(true_sig)
+        true_bg_bc_bb_hybrid  = get_true_bin_content(be_hybrid, bg_pdf, bg_result.x)
+        true_sig_bc_bb_hybrid = get_true_bin_content(be_hybrid, sig_pdf, sig_p)
 
         # for j in xrange(1000):
         for j in tqdm_notebook(xrange(3000), desc='Toys', leave=False):
-            mc_bg = gen_toy(n_bg)  # np.random.poisson(n_bg))
-            # mc_bg_bb = generate_toy_data(bg_result.x, n_bg)
+            mc_bg = gen_toy(np.random.poisson(n_bg))
+            # mc_bg = gen_toy(n_bg)
+            # Per toy bb binning:
+
             # be_bg = bayesian_blocks(mc_bg, p0=0.02)
+            # be_bg[-1] += 0.1
             # be_bg = np.append(be_bg, [13000])
             # be_bg[0] = 2800
+            # be_hybrid = np.sort(np.unique(np.concatenate([be_bg, be_sig])))
 
-            # true_bg_bc_bb  = []
-            # for k in range(len(be_bg)-1):
-            #     true_bg, _   = integrate.quad(functools.partial(bg_pdf, a=bg_result.x),
-            #                                   be_bg[k], be_bg[k+1])
-            #     true_bg_bc_bb.append(true_bg)
+            # true_bg_bc_bb  = get_true_bin_content(be_bg, bg_pdf, bg_result.x)
+            # true_sig_bc_bb = get_true_bin_content(be_bg, sig_pdf, sig_p)
+            # true_bg_bc_bb_hybrid  = get_true_bin_content(be_hybrid, bg_pdf, bg_result.x)
+            # true_sig_bc_bb_hybrid = get_true_bin_content(be_hybrid, sig_pdf, sig_p)
 
             uA_mle = calc_A_unbinned(mc_bg, bg_sig_model, bg_result.x, sig_p)
             unbinned_A_mle[i].append(uA_mle)
-            # uA, uA_mle = calc_A_unbinned(mc_bg, bg_sig_model, bg_result.x, sig_p)
-            # unbinned_A[i].append(uA)
 
             cA_mle, _, _ = calc_A_cnc(mc_bg, bg_result.x, sig_p, xlow=4800)
             cnc_A_mle[i].append(cA_mle)
-            # cA, cA_mle = calc_A_cnc(mc_bg, bg_result.x, sig_p)
-            # cnc_A[i].append(cA)
 
             bc_bb, _ = np.histogram(mc_bg, bins=be_bg)
             bA_mle = calc_A_binned(bc_bb, true_bg_bc_bb, true_sig_bc_bb)
             binned_A_mle[i].append(bA_mle)
-            # bA, bA_mle = calc_A_binned(bc_bb, true_bg_bc_bb, true_sig_bc_bb)
-            # binned_A[i].append(bA)
 
             bc_hybrid, _ = np.histogram(mc_bg, bins=be_hybrid)
             bA_hybrid_mle = calc_A_binned(bc_hybrid, true_bg_bc_bb_hybrid, true_sig_bc_bb_hybrid)
             binned_A_hybrid_mle[i].append(bA_hybrid_mle)
-            # bA_hybrid, bA_hybrid_mle = calc_A_binned(bc_hybrid, true_bg_bc_bb_hybrid,
-            #                                          true_sig_bc_bb_hybrid)
-            # binned_A_hybrid[i].append(bA_hybrid)
 
             bc_50, _ = np.histogram(mc_bg, bins=be_50GeV)
             bA_50_mle = calc_A_binned(bc_50, true_bg_bc_50GeV, true_sig_bc_50GeV)
             binned_A_50_mle[i].append(bA_50_mle)
-            # bA_50, bA_50_mle = calc_A_binned(bc_50, true_bg_bc_50GeV, true_sig_bc_50GeV)
-            # binned_A_50[i].append(bA_50)
 
             bc_100, _ = np.histogram(mc_bg, bins=be_100GeV)
             bA_100_mle = calc_A_binned(bc_100, true_bg_bc_100GeV, true_sig_bc_100GeV)
             binned_A_100_mle[i].append(bA_100_mle)
-            # bA_100, bA_100_mle = calc_A_binned(bc_100, true_bg_bc_100GeV, true_sig_bc_100GeV)
-            # binned_A_100[i].append(bA_100)
 
             bc_200, _ = np.histogram(mc_bg, bins=be_200GeV)
             bA_200_mle = calc_A_binned(bc_200, true_bg_bc_200GeV, true_sig_bc_200GeV)
             binned_A_200_mle[i].append(bA_200_mle)
-            # bA_200, bA_200_mle = calc_A_binned(bc_200, true_bg_bc_200GeV, true_sig_bc_200GeV)
-            # binned_A_200[i].append(bA_200)
 
             bc_400, _ = np.histogram(mc_bg, bins=be_400GeV)
             bA_400_mle = calc_A_binned(bc_400, true_bg_bc_400GeV, true_sig_bc_400GeV)
             binned_A_400_mle[i].append(bA_400_mle)
-            # bA_400, bA_400_mle = calc_A_binned(bc_400, true_bg_bc_400GeV, true_sig_bc_400GeV)
-            # binned_A_400[i].append(bA_400)
 
             bc_1000, _ = np.histogram(mc_bg, bins=be_1000GeV)
             bA_1000_mle = calc_A_binned(bc_1000, true_bg_bc_1000GeV, true_sig_bc_1000GeV)
             binned_A_1000_mle[i].append(bA_1000_mle)
-            # bA_1000, bA_1000_mle = calc_A_binned(bc_1000, true_bg_bc_1000GeV, true_sig_bc_1000GeV)
-            # binned_A_1000[i].append(bA_1000)
 
             bc_2000, _ = np.histogram(mc_bg, bins=be_2000GeV)
             bA_2000_mle = calc_A_binned(bc_2000, true_bg_bc_2000GeV, true_sig_bc_2000GeV)
             binned_A_2000_mle[i].append(bA_2000_mle)
-            # bA_2000, bA_2000_mle = calc_A_binned(bc_2000, true_bg_bc_2000GeV, true_sig_bc_2000GeV)
-            # binned_A_2000[i].append(bA_2000)

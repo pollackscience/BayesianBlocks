@@ -29,7 +29,7 @@ if __name__ == "__main__":
     gRandom.SetSeed(2)
 
     bg_sig_model = ff.Model(bh_tools.bg_sig_pdf, ['C', 'mu', 'sigma', 'alpha', 'beta', 'gamma'])
-    sig_params = [(4750, 970), (5350, 1070), (6000, 1200), (6600, 1300),
+    sig_params = [(5350, 1070), (6000, 1200), (6600, 1300),
                   (7150, 1440), (7800, 1500), (8380, 1660)]
     # sig_params = [(4750, 970)]
 
@@ -48,7 +48,8 @@ if __name__ == "__main__":
             cnc_A_mle = []
             for j in tqdm_notebook(xrange(n_toys), desc='Toys', leave=False):
 
-                mc_bg = gen_toy(n_bg)
+                # mc_bg = gen_toy(n_bg)
+                mc_bg = gen_toy(500)
                 # while max(mc_bg) < xlow:
                 #    mc_bg = gen_toy(n_bg)
 
