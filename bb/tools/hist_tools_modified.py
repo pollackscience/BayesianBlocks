@@ -14,7 +14,7 @@ from bayesian_blocks_modified import bayesian_blocks
 #from fill_between_steps import fill_between_steps
 
 
-def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, *args, **kwargs):
+def hist(x, bins=10, fitness='events', gamma=None, p0=0.05, errorbars=None, suppress_zero=False, *args, **kwargs):
     """Enhanced histogram, based on `hist` function from astroML.
 
     This is a histogram function that enables the use of more sophisticated
@@ -106,6 +106,8 @@ def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, 
         marker = None
 
 # generate histogram-like object
+    vis_objects = None
+    vis_objects_err = None
     if marker:
         if 'normed' in kwargs:
             normed = kwargs.pop('normed')
@@ -119,92 +121,175 @@ def hist(x, bins=10, fitness='events', gamma = None, p0=0.05, errorbars = None, 
             linestyle = kwargs.pop('linestyle')
         else:
             linestyle = ''
-        bin_content, bins = np.histogram(x, bins, density=normed)
+        hrange = None
+        if 'range' in kwargs:
+            hrange = kwargs.pop('range')
+
+        bin_content, bins = np.histogram(x, bins, density=normed, range=hrange)
         bin_content = np.asarray(bin_content, dtype=float)
+        if normed:
+            bin_content_raw, _ = np.histogram(x, bins, density=False, range=hrange)
+            bin_content_raw = np.asarray(bin_content_raw)
+        else:
+            bin_content_raw = bin_content
         width = (bins[1:]-bins[:-1])
         bin_centers = bins[:-1]+width*0.5
-        bin_error = np.sqrt(bin_content)
+        # bin_error = np.sqrt(bin_content)
+        err_low = np.asarray([poisson_error(bc, suppress_zero)[0] for bc in bin_content_raw])
+        err_hi = np.asarray([poisson_error(bc, suppress_zero)[1] for bc in bin_content_raw])
+        err_scale = bin_content/bin_content_raw
+        err_low *= err_scale
+        err_hi *= err_scale
+        bin_error = [err_low, err_hi]
         if errorbars:
-            vis_objects = ax.errorbar(bin_centers, bin_content, linestyle = linestyle, marker = markerstyle, yerr=bin_error, **kwargs)
+            vis_objects_err = ax.errorbar(bin_centers, bin_content, linestyle=linestyle,
+                                          marker=markerstyle, yerr=bin_error, **kwargs)
         else:
-            vis_objects = ax.plot(bin_centers, bin_content, linestyle = linestyle, marker = markerstyle, **kwargs)
+            vis_objects = ax.plot(bin_centers, bin_content, linestyle=linestyle, marker=markerstyle,
+                                  **kwargs)
+        if 'color' in kwargs:
+            kwargs.pop('color')
 
     else:
-        bin_content, bins, vis_objects = ax.hist(x, bins, **kwargs)
+        if 'normed' in kwargs:
+            normed = kwargs.pop('normed')
+        else:
+            normed = False
+        hrange = None
+        if 'range' in kwargs:
+            hrange = kwargs.pop('range')
+
+        bin_content, bins, vis_objects = ax.hist(x, bins, range=hrange, normed=normed, **kwargs)
+        if 'color' in kwargs:
+            kwargs.pop('color')
         bin_content = np.asarray(bin_content, dtype=float)
-        bin_error = np.sqrt(bin_content)
+        if normed:
+            bin_content_raw, _ = np.histogram(x, bins, density=False, range=hrange)
+            bin_content_raw = np.asarray(bin_content_raw)
+        else:
+            bin_content_raw = bin_content
+
+        err_low = np.asarray([poisson_error(bc, suppress_zero)[0] for bc in bin_content_raw])
+        err_hi = np.asarray([poisson_error(bc, suppress_zero)[1] for bc in bin_content_raw])
+        err_scale = bin_content/bin_content_raw
+        err_low *= err_scale
+        err_hi *= err_scale
+        bin_error = [err_low, err_hi]
         width = (bins[1:]-bins[:-1])
         bin_centers = bins[:-1]+width*0.5
-        #if 'histtype' in kwargs:
-        #    kwargs.pop('histtype')
-        #if 'weights' in kwargs:
-        #    kwargs.pop('weights')
-        #vis_objects = ax.errorbar(bin_centers, bin_content, linestyle = '', marker = '.',
-        #                          yerr=bin_error, linewidth=2, **kwargs)
+        vis_color = vis_objects[0].get_facecolor()
+        if 'histtype' in kwargs:
+            if kwargs['histtype'] == 'step':
+                vis_color = vis_objects[0].get_edgecolor()
+            kwargs.pop('histtype')
+        if 'weights' in kwargs:
+            kwargs.pop('weights')
+        if 'label' in kwargs:
+            kwargs.pop('label')
+        if 'linewidth' in kwargs:
+            kwargs.pop('linewidth')
+        if errorbars:
+            vis_objects_err = ax.errorbar(bin_centers, bin_content, linestyle='', marker='.',
+                                          yerr=bin_error, linewidth=2,
+                                          color=vis_color, **kwargs)
 
 # perform any scaling if necessary, including redrawing of the scaled objects
     if scale:
-        if isinstance(vis_objects[0], matplotlib.patches.Rectangle):
-            if scale == 'binwidth':
-                for i, bc in enumerate(bin_content):
-                    width = (bins[i+1]-bins[i])
-                    bin_content[i] /= width
-                    bin_error[i] /=width
-                    plt.setp(vis_objects[i], 'height', vis_objects[i].get_height()/width)
-            elif isinstance(scale, Number):
-                for i, bc in enumerate(bin_content):
-                    bin_content[i] *= scale
-                    bin_error[i] *= scale
-                    plt.setp(vis_objects[i], 'height', vis_objects[i].get_height()*scale)
-            else:
-                warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
+        bin_content_scaled = []
+        if vis_objects is not None:
+            if isinstance(vis_objects[0], matplotlib.patches.Rectangle):
+                if scale == 'binwidth':
+                    for i, bc in enumerate(bin_content):
+                        width = (bins[i+1]-bins[i])
+                        bin_content_scaled.append(bin_content[i]/width)
+                        plt.setp(vis_objects[i], 'height', vis_objects[i].get_height()/width)
+                elif isinstance(scale, Number):
+                    for i, bc in enumerate(bin_content):
+                        bin_content_scaled.append(bin_content[i]*scale)
+                        plt.setp(vis_objects[i], 'height', vis_objects[i].get_height()*scale)
+                else:
+                    warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
 
-        elif isinstance(vis_objects[0], matplotlib.patches.Polygon):
-            xy = vis_objects[0].get_xy()
-            j = 0
-            if scale == 'binwidth':
-                for i, bc in enumerate(bin_content):
-                    width = (bins[i+1]-bins[i])
-                    bin_content[i] /= width
-                    bin_error[i] /= width
-                    xy[j+1,1] = bin_content[i]
-                    xy[j+2,1] = bin_content[i]
-                    j+=2
-            elif isinstance(scale, Number):
-                for i, bc in enumerate(bin_content):
-                    bin_content[i] *= scale
-                    bin_error[i] *= scale
-                    xy[j+1,1] = bin_content[i]
-                    xy[j+2,1] = bin_content[i]
-                    j+=2
-            else:
-                warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
-            plt.setp(vis_objects[0], 'xy', xy)
+            elif isinstance(vis_objects[0], matplotlib.patches.Polygon):
+                xy = vis_objects[0].get_xy()
+                j = 0
+                if scale == 'binwidth':
+                    for i, bc in enumerate(bin_content):
+                        width = (bins[i+1]-bins[i])
+                        bin_content_scaled.append(bin_content[i]/width)
+                        xy[j+1,1] = bin_content_scaled[i]
+                        xy[j+2,1] = bin_content_scaled[i]
+                        j+=2
+                elif isinstance(scale, Number):
+                    for i, bc in enumerate(bin_content):
+                        bin_content_scaled.append(bin_content[i]*scale)
+                        xy[j+1,1] = bin_content_scaled[i]
+                        xy[j+2,1] = bin_content_scaled[i]
+                        j+=2
+                else:
+                    warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
+                plt.setp(vis_objects[0], 'xy', xy)
 
-        elif isinstance(vis_objects[0], matplotlib.lines.Line2D):
+        if vis_objects_err is not None:
             if scale == 'binwidth':
                 for i, bc in enumerate(bin_content):
                     width = (bins[i+1]-bins[i])
-                    bin_content[i] /= width
-                    bin_error[i] /= width
+                    if len(bin_content_scaled) != len(bin_content):
+                        bin_content_scaled.append(bin_content[i]/width)
+                    bin_error[0][i] /= width
+                    bin_error[1][i] /= width
             elif isinstance(scale, Number):
                 for i, bc in enumerate(bin_content):
-                    bin_content[i] *= scale
-                    bin_error[i] *= scale
+                    if len(bin_content_scaled) != len(bin_content):
+                        bin_content_scaled.append(bin_content[i]*scale)
+                    bin_error[0][i] *= scale
+                    bin_error[1][i] *= scale
             else:
                 warnings.warn("scale argument value `", scale, "` not supported: it will be ignored.")
-            vis_objects[0].set_ydata(bin_content)
-            if errorbars:
-                vis_objects[1][0].set_ydata(bin_content-bin_error)
-                vis_objects[1][1].set_ydata(bin_content+bin_error)
-                tmplines = vis_objects[2][0].get_segments()
-                for i, bc in enumerate(bin_content):
-                    tmplines[i][0][1] = bin_content[i]-bin_error[i]
-                    tmplines[i][1][1] = bin_content[i]+bin_error[i]
-                vis_objects[2][0].set_segments(tmplines)
+            bin_content_scaled = np.asarray(bin_content_scaled)
+            vis_objects_err[0].set_ydata(bin_content_scaled)
+
+            vis_objects_err[1][0].set_ydata(bin_content_scaled-bin_error[0])
+            vis_objects_err[1][1].set_ydata(bin_content_scaled+bin_error[1])
+            #vis_objects_err[1][0].set_ydata(bin_error[0])
+            #vis_objects_err[1][1].set_ydata(bin_error[1])
+            tmplines = vis_objects_err[2][0].get_segments()
+            for i, bc in enumerate(bin_content_scaled):
+                tmplines[i][0][1] = bin_content_scaled[i]-bin_error[0][i]
+                tmplines[i][1][1] = bin_content_scaled[i]+bin_error[1][i]
+                #tmplines[i][0][1] = bin_error[0][i]
+                #tmplines[i][1][1] = bin_error[1][i]
+            vis_objects_err[2][0].set_segments(tmplines)
 
         ax.relim()
         ax.autoscale_view(False,False,True)
 
-    return bin_content, bins, vis_objects
+    try:
+        bc = bin_content_scaled
+    except:
+        bc = bin_content
+    return bc, bins, vis_objects
 
+
+def poisson_error(bin_content, suppress_zero=False):
+    '''Returns a high and low 1-sigma error bar for an input bin value, as defined in:
+    https://www-cdf.fnal.gov/physics/statistics/notes/pois_eb.txt
+    If bin_content > 9, returns the sqrt(bin_content)'''
+    error_dict = {
+        0: (0.000000, 1.000000),
+        1: (0.381966, 2.618034),
+        2: (1.000000, 4.000000),
+        3: (1.697224, 5.302776),
+        4: (2.438447, 6.561553),
+        5: (3.208712, 7.791288),
+        6: (4.000000, 9.000000),
+        7: (4.807418, 10.192582),
+        8: (5.627719, 11.372281),
+        9: (6.458619, 12.541381)}
+
+    if suppress_zero and bin_content == 0:
+        return (0, 0)
+    elif bin_content in error_dict:
+        return error_dict[bin_content]
+    else:
+        return (np.sqrt(bin_content), np.sqrt(bin_content))

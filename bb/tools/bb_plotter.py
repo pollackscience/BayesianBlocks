@@ -290,12 +290,54 @@ def make_bb_plot(data, p0, save_dir, range=None,title='Plot of thing vs thing', 
     plt.savefig(save_dir+save_name+'_bb.pdf')
     return bb_content,bb_edges
 
-def make_fit_plot(data, bins, range, frozen_pdf, title, xlabel='M (GeV)', ylabel='Count', extra_pdf_tuple=None, textstr=None):
+
+def make_bb_plot_v2(data, p0, save_dir, hrange=None,title='Plot of thing vs thing', xlabel='X axis',
+                    ylabel='Y axis', save_name='plot', edges=None,scale=None, bin_width=100,
+                    logy=False, color='blue'):
+
+    normed=False
+    if scale=='normed':
+        normed=True
+        scale=None
+
+    if edges != None:
+        bb_edges=edges
+    else:
+        bb_edges = bayesian_blocks(data,p0=p0)
+
+    if hrange == None:
+        hrange=(min(data), max(data))
+
+    nbins = (hrange[1]-hrange[0])/bin_width
+    uni_edges = np.linspace(hrange[0], hrange[1], nbins+1)
+    plt.figure()
+    #bin_content = np.histogram(data,bb_edges,density=True)[0]
+    if logy:
+        plt.yscale('log', nonposy='clip')
+
+
+    hist(data, bins=uni_edges,range=hrange,histtype='stepfilled',alpha=0.2,
+         label='{} GeV bins'.format(bin_width),normed=normed,scale=scale, color=color)
+    #hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=False)
+    bb_content, bb_edges,_ = hist(data,bins=bb_edges,range=hrange,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=normed,scale=scale)
+    #fill_between_steps(plt.gca(), bb_edges, bin_content*len(data),bin_content*len(data)/2, alpha=0.5, step_where='pre',linewidth=2,label='norm attempt')
+    plt.legend()
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.savefig(save_dir+save_name+'_bb.pdf')
+    return bb_content,bb_edges
+
+
+def make_fit_plot(data, bins, range, frozen_pdf, title, xlabel='M (GeV)', ylabel='Count',
+                  hist_label = 'hist', pdf_label = 'pdf', extra_pdf_tuple=None, textstr=None, ax=None):
     x       = np.linspace(range[0], range[1], 10000)
     binning = (range[1]-range[0])/bins
-    plt.figure()
-    plt.hist(data, bins, range=range, alpha=0.2, histtype='stepfilled', label='sim data')
-    plt.plot(x, (len(data)*binning)*frozen_pdf(x), linewidth=2, label='fitted pdf')
+    if not ax:
+        plt.figure()
+        ax = plt.subplot()
+    plt.hist(data, bins, range=range, alpha=0.2, histtype='stepfilled', label=hist_label)
+    plt.plot(x, (len(data)*binning)*frozen_pdf(x), linewidth=2, label=pdf_label)
     if extra_pdf_tuple != None:
         '''extra_pdf_tuple = (extra_frozen_pdf, extra_scale, extra_label)'''
         plt.plot(x, (len(data)*binning*extra_pdf_tuple[1])*extra_pdf_tuple[0](x), 'k--', label=extra_pdf_tuple[2])
@@ -305,9 +347,8 @@ def make_fit_plot(data, bins, range, frozen_pdf, title, xlabel='M (GeV)', ylabel
     plt.legend()
     if textstr:
         props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
-        plt.text(0.85, 0.8, textstr, transform=plt.gca().transAxes, fontsize=14,
+        # plt.text(0.85, 0.8, textstr, transform=plt.gca().transAxes, fontsize=14,
+        #     verticalalignment='top', bbox=props)
+        plt.text(0.86, 0.7, textstr, transform=plt.gca().transAxes, fontsize=16,
             verticalalignment='top', bbox=props)
-
-
-
-
+    return ax

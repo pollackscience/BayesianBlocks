@@ -2,8 +2,10 @@ import numpy as np
 import numpy.ma as ma
 import collections
 
+
 def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
-    ''' fill between a step plot and
+    ''' Fill between for a step plot histogram.
+    Modified from original code produced by T. Caswell (https://github.com/tacaswell).
 
     Parameters
     ----------
@@ -30,15 +32,17 @@ def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
 
     '''
 
+    # Modification to account for histogram-like bin-edges
     if len(x) == len(y1)+1:
-        kwargs['linewidth']=0
-        if isinstance(y2,collections.Container):
+        kwargs['linewidth'] = 0
+        if isinstance(y2, collections.Container):
             _y2 = y2[0:2]
         else:
             _y2 = y2
-        a = fill_between_steps(ax, x[0:2], y1[0:2], y2=_y2, step_where='post', **kwargs)
-        kwargs['label']=None
+        fill_between_steps(ax, x[0:2], y1[0:2], y2=_y2, step_where='post', **kwargs)
+        kwargs['label'] = None
         return fill_between_steps(ax, x[1:], y1, y2=y2, step_where='pre', **kwargs)
+
     if step_where not in {'pre', 'post', 'mid'}:
         raise ValueError("where must be one of {{'pre', 'post', 'mid'}} "
                          "You passed in {wh}".format(wh=step_where))
@@ -82,4 +86,3 @@ def fill_between_steps(ax, x, y1, y2=0, step_where='pre', **kwargs):
 
     # now to the plotting part:
     return ax.fill_between(xx, yy1, y2=yy2, **kwargs)
-
