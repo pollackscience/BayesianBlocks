@@ -1,10 +1,10 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 from __future__ import division
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
-from hist_tools_modified import hist
+from .hist_tools_modified import hist
 from fill_between_steps import fill_between_steps
 from matplotlib.ticker import MaxNLocator
 

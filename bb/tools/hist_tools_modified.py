@@ -10,7 +10,7 @@ from astroML.density_estimation import\
     knuth_bin_width
 
 #from bb_poly import bayesian_blocks
-from bayesian_blocks_modified import bayesian_blocks
+from .bayesian_blocks_modified import bayesian_blocks
 #from fill_between_steps import fill_between_steps
 
 
