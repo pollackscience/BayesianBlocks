@@ -1,19 +1,18 @@
 #! /usr/bin/env python3
 
 from __future__ import division
-from __future__ import absolute_import
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
 from .hist_tools_modified import hist
-from .fill_between_steps import fill_between_steps
+from fill_between_steps import fill_between_steps
 from matplotlib.ticker import MaxNLocator
 
 from astroML.density_estimation import\
     scotts_bin_width, freedman_bin_width,\
     knuth_bin_width
 #from bb_poly import bayesian_blocks
-from .bayesian_blocks_modified import bayesian_blocks
+from bayesian_blocks_modified import bayesian_blocks
 
 from plotly.offline import download_plotlyjs, init_notebook_mode, iplot, plot
 import plotly.graph_objs as go

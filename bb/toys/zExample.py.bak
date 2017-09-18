@@ -1,31 +1,29 @@
 #! /usr/bin/env python
 
 #from bayesianBlocks import *
-from __future__ import absolute_import
-from __future__ import print_function
 import numpy as np
 from astroML.plotting import hist
 import matplotlib.pyplot as plt
 import pandas as pd
-import six.moves.cPickle as pkl
+import cPickle as pkl
 import os
 
 
 
 def generateToy():
 
-  print('loading values')
+  print 'loading values'
   if not os.path.isfile('values2.p'):
     z_data = np.loadtxt('values2.dat')
     pkl.dump( z_data, open( 'values2.p', "wb" ),pkl.HIGHEST_PROTOCOL )
   else:
     z_data = pkl.load(open('values2.p',"rb"))
-  print('loaded')
+  print 'loaded'
 
   #x = np.random.normal(size=1000)
   z_data_subset = z_data[0:20000]
   plot_range = [50,400]
-  print('max',max(z_data_subset),'min',min(z_data_subset))
+  print 'max',max(z_data_subset),'min',min(z_data_subset)
   plt.yscale('log', nonposy='clip')
   plt.axes().set_ylim(0.0000001,0.17)
   hist(z_data_subset,range=plot_range,bins=100,normed=1,histtype='stepfilled',

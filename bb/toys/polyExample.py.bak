@@ -1,21 +1,19 @@
 #! /usr/bin/env python
 
 #from bayesianBlocks import *
-from __future__ import absolute_import
 import numpy as np
 from bb.tools.hist_tools_modified import hist
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
 import bb.tools.bb_poly as bbp
 import matplotlib.pyplot as plt
 import pandas as pd
-import six.moves.cPickle as pkl
+import cPickle as pkl
 import os
 from scipy.stats import powerlaw
 from scipy.stats import triang
 from scipy.stats import uniform
 import ROOT
 from ROOT import TF1
-from six.moves import range
 
 
 
@@ -32,7 +30,7 @@ def generateToy():
     ROOT.gRandom.SetSeed(8675309)
     poly1_gen = TF1("poly1","2*x",0,10)
     my_rands = []
-    for i in range(nentries):
+    for i in xrange(nentries):
         my_rands.append(poly1_gen.GetRandom())
 
     fig = plt.figure()

@@ -1,8 +1,6 @@
 #! /usr/bin/env python
 
 from __future__ import division
-from __future__ import absolute_import
-from __future__ import print_function
 import os
 import functools
 import bisect
@@ -10,7 +8,7 @@ import numpy as np
 from scipy.stats import norm
 import scipy.integrate as integrate
 from scipy.stats import poisson
-import six.moves.cPickle as pkl
+import cPickle as pkl
 from matplotlib import pyplot as plt
 # from lmfit import Model
 from bb.tools.bayesian_blocks_modified import bayesian_blocks
@@ -18,7 +16,6 @@ import nllfitter.future_fitter as ff
 from ROOT import gRandom
 from ROOT import TF1
 from tqdm import tqdm_notebook
-from six.moves import range
 
 
 def lm_binned_wrapper(mu_bg, mu_sig):
@@ -247,14 +244,14 @@ def get_mismatch_metric_v3(bc_nominal, be_nominal, bc_test, be_test, main_edge):
 
 def calc_local_pvalue(N_bg, var_bg, N_sig, var_sig, ntoys=1e7):
     '''Not an accurate estimate for large sigma'''
-    print('')
-    print('Calculating local p-value and significance based on {0} toys'.format(ntoys))
-    print('N_bg = {0}, sigma_bg = {1}, N_signal = {2}'.format(N_bg, var_bg, N_sig))
+    print ''
+    print 'Calculating local p-value and significance based on {0} toys'.format(ntoys)
+    print 'N_bg = {0}, sigma_bg = {1}, N_signal = {2}'.format(N_bg, var_bg, N_sig)
     toys    = np.random.normal(N_bg, var_bg, int(ntoys))
     pvars   = np.random.poisson(toys)
     pval    = pvars[pvars > N_bg + N_sig].size/ntoys
-    print('local p-value = {0}'.format(pval))
-    print('local significance = {0:.2f}'.format(np.abs(norm.ppf(1-pval))))
+    print 'local p-value = {0}'.format(pval)
+    print 'local significance = {0:.2f}'.format(np.abs(norm.ppf(1-pval)))
 
 
 def generate_initial_params(hgg_bg, hgg_signal, n_sigma):
@@ -292,8 +289,8 @@ def generate_initial_params(hgg_bg, hgg_signal, n_sigma):
 def generate_toy_data(bg_pdf_ROOT, sig_pdf_ROOT, n_bg, n_sig, seed=None):
     '''use bg and signal params to generated simulated data'''
     # bg dist
-    mc_bg = [bg_pdf_ROOT.GetRandom() for i in range(n_bg)]
-    mc_sig = [sig_pdf_ROOT.GetRandom() for i in range(n_sig)]
+    mc_bg = [bg_pdf_ROOT.GetRandom() for i in xrange(n_bg)]
+    mc_sig = [sig_pdf_ROOT.GetRandom() for i in xrange(n_sig)]
     return mc_bg, mc_sig
 
 
@@ -534,7 +531,7 @@ if __name__ == "__main__":
     # Do a bunch of toys
     gRandom.SetSeed(20)
 
-    for i in tqdm_notebook(list(range(1000))):
+    for i in tqdm_notebook(range(1000)):
         mc_bg, mc_sig = generate_toy_data(tf1_bg_pdf, tf1_sig_pdf, n_bg, n_sig)
         mc_bg_sig = mc_bg+mc_sig
 

@@ -1,14 +1,13 @@
 #! /usr/bin/env python
 
 from __future__ import division
-from __future__ import absolute_import
 import os
 import functools
 import numpy as np
 # from scipy.stats import norm
 import scipy.integrate as integrate
 from scipy.stats import poisson
-import six.moves.cPickle as pkl
+import cPickle as pkl
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
@@ -20,7 +19,6 @@ from ROOT import TF1
 from tqdm import tqdm_notebook
 from bb.tools.fill_between_steps import fill_between_steps
 from numba import jit
-from six.moves import range
 # from bb.tools.hist_tools_modified import hist
 
 
@@ -141,7 +139,7 @@ def generate_initial_params(data_bg_mul2, data_bg_mul8, seed=5):
     bg_pdf_ROOT = functools.partial(bg_pdf, doROOT=True)
     tf1_bg_pdf = TF1("tf1_bg_pdf", bg_pdf_ROOT, 2800, 13000, 3)
     tf1_bg_pdf.SetParameters(*bg_result.x)
-    mc_bg = [tf1_bg_pdf.GetRandom() for i in range(n_bg)]
+    mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
 
     be_bg = bayesian_blocks(mc_bg, p0=0.02)
     be_bg[-1] += 0.1
@@ -162,7 +160,7 @@ def generate_toy_data_wrapper(bg_params):
     tf1_bg_pdf.SetParameters(*bg_params)
 
     def generate_toy_data(n_bg):
-        mc_bg = [tf1_bg_pdf.GetRandom() for i in range(n_bg)]
+        mc_bg = [tf1_bg_pdf.GetRandom() for i in xrange(n_bg)]
         return mc_bg
     return generate_toy_data
 
@@ -381,7 +379,7 @@ if __name__ == "__main__":
 
         n_sig = n_bg
         tf1_sig_pdf.SetParameters(*sig_p)
-        mc_sig = [tf1_sig_pdf.GetRandom() for ns in range(n_sig)]
+        mc_sig = [tf1_sig_pdf.GetRandom() for ns in xrange(n_sig)]
         be_sig = bayesian_blocks(mc_sig, p0=0.02)
 
         true_sig_bc_bb      = get_true_bin_content(be_bg, sig_pdf, sig_p)
@@ -398,7 +396,7 @@ if __name__ == "__main__":
         true_sig_bc_bb_hybrid = get_true_bin_content(be_hybrid, sig_pdf, sig_p)
 
         # for j in xrange(1000):
-        for j in tqdm_notebook(range(3000), desc='Toys', leave=False):
+        for j in tqdm_notebook(xrange(3000), desc='Toys', leave=False):
             mc_bg = gen_toy(np.random.poisson(n_bg))
             # mc_bg = gen_toy(n_bg)
             # Per toy bb binning:

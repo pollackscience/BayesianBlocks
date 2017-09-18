@@ -1,12 +1,9 @@
 #! /usr/bin/env python
 
-from __future__ import absolute_import
-from __future__ import print_function
 import numpy as np
 import matplotlib.pyplot as plt
 from hist_tools_modified import hist
 from scipy.stats import uniform
-from six.moves import range
 
 plt.close('all')
 fig, ax = plt.subplots()
@@ -15,7 +12,7 @@ plt.get_current_fig_manager().window.wm_geometry("-2800-600")
 ax.set_xlim(0,0.55)
 ax.set_ylim(0,5.2)
 test_data=[ 0.03815414 , 0.09320462 , 0.11173259 , 0.3899594 ,  0.48899476]
-print(test_data)
+print test_data
 
 my_hist = None
 frame=0

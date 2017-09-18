@@ -1,13 +1,11 @@
 #! /usr/bin/env python
 
-from __future__ import absolute_import
-from __future__ import print_function
 import numpy as np
 from scipy import stats
 from matplotlib import pyplot as plt
 from hist_tools_modified import hist
 import re
-import six.moves.cPickle as pkl
+import cPickle as pkl
 
 from ROOT import TFile
 from ROOT import gDirectory
@@ -37,7 +35,7 @@ for ST in [5]:
     fig = plt.figure()
     ax = plt.gca()
     hist(my_ST, bins=200, histtype='bar',alpha=0.2, label='standard histogram',normed=normed,log=log)
-    print('doing bb')
+    print 'doing bb'
     p0=0.01
     hist(my_ST, bins = 'blocks', fitness = 'events', p0=p0,  ax = ax, histtype='step', label='Bayesian Blocks', linewidth=2,normed=normed,log=log)
     ax.legend()

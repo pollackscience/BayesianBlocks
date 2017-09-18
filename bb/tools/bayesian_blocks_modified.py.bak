@@ -11,16 +11,8 @@ References
 .. [1] http://adsabs.harvard.edu/abs/2012arXiv1207.5578S
 """
 from __future__ import division
-from __future__ import absolute_import
-from __future__ import print_function
 import numpy as np
-from sympy.solvers import solve
-from sympy import Symbol
-from sympy.functions import re
-from sympy.mpmath import *
 from scipy import optimize
-from six.moves import range
-from six.moves import input
 # TODO: implement other fitness functions from appendix B of Scargle 2012
 
 
@@ -68,7 +60,7 @@ class FitnessFunc(object):
     def args(self):
         try:
             # Python 2
-            return self.fitness.__code__.co_varnames[1:]
+            return self.fitness.func_code.co_varnames[1:]
         except AttributeError:
             return self.fitness.__code__.co_varnames[1:]
 
@@ -87,70 +79,55 @@ class PolyEvents(FitnessFunc):
         p ~ gamma^N.  If gamma is specified, p0 is ignored.
     """
     def fitness(self, N_k, M_k, N_i):
-        verbose = True
+        verbose = False
         # eq. 19 from Scargle 2012
         #a = (N_k-2)/(T_k*(N_k-1))
         if(verbose):
-          print('fitness call')
-          print('N_i',N_i)
-          print('N_k',N_k)
-          print('M_k',M_k)
+            print 'fitness call'
+            print 'N_i',N_i
+            print 'N_k',N_k
+            print 'M_k',M_k
         #raw_input()
-        x = Symbol('x')
         a_i = []
 
         def f_a(a,M_k,N_k,N_i,i):
-          return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1
-          #return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i+1:]-N_i[-1])/(1+a*(N_i[i+1:]-N_i[-1])))**-1
+            return 2/M_k[i] - a + (N_k[i]) * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1
 
         for i in range(len(N_i)):
 
         #special cases
-          if N_k[i]==1:
-            a_i.append(np.inf)
-          elif N_k[i]==2:
-            a_i.append(0)
+            if N_k[i]==1:
+                a_i.append(np.inf)
+            elif N_k[i]==2:
+                a_i.append(0)
 
-          else:
+            else:
 
-            #upper_bound = 2.0/M_k[i]
-            upper_bound= min(1.0/(N_i[-1]-N_i[0]),2.0/M_k[i])
-            #upper_bound= max(1.0/(N_i[-1]-N_i[-2]),2.0/M_k[i])*2
-            lower_bound = upper_bound
-            #start_val = (lower_bound+upper_bound)/2.0
-            start_val = upper_bound/10.0
+                #upper_bound = 2.0/M_k[i]
+                upper_bound= min(1.0/(N_i[-1]-N_i[0]),2.0/M_k[i])
+                #upper_bound= max(1.0/(N_i[-1]-N_i[-2]),2.0/M_k[i])*2
+                lower_bound = upper_bound
+                #start_val = (lower_bound+upper_bound)/2.0
+                start_val = upper_bound/10.0
 
 
             while(np.sign(f_a(upper_bound,M_k,N_k,N_i,i))==np.sign(f_a(lower_bound,M_k,N_k,N_i,i))):
-              lower_bound-=0.1
+                lower_bound-=0.1
             if verbose:
-              print('a_i loop')
-              print('M_k', M_k[i])
-              print('N_k', N_k[i])
-              print('N_i', N_i)
-              print('upper', upper_bound, f_a(upper_bound,M_k,N_k,N_i,i))
-              print('lower', lower_bound, f_a(lower_bound,M_k,N_k,N_i,i))
-              print(f_a(x,M_k,N_k,N_i,i))
+                print 'a_i loop'
+                print 'M_k', M_k[i]
+                print 'N_k', N_k[i]
+                print 'N_i', N_i
+                print 'upper', upper_bound, f_a(upper_bound,M_k,N_k,N_i,i)
+                print 'lower', lower_bound, f_a(lower_bound,M_k,N_k,N_i,i)
+                print f_a(x,M_k,N_k,N_i,i)
 
             #a_sol = optimize.newton(f_a,start_val,args=(M_k,N_k,N_i,i),maxiter=5000)
             a_sol = optimize.brentq(f_a,lower_bound,upper_bound,args=(M_k,N_k,N_i,i),maxiter=5000)
-            #a_sol = start_val
-            #print a_sol
-            #a_sol = a_sol.x[0]
-
-
-            #f2 = lambda a: f_a(a,M_k,N_k,N_i,i)
-            #a_sol = findroot(lambda a: 2/M_k[i] - a + N_k[i] * np.sum((N_i[i:-1]-N_i[-1])/(1+a*(N_i[i:-1]-N_i[-1])))**-1,start_val)
-            #a_sol = findroot(f2,start_val+1,tol=0.0001,solver = 'newton')
-            #a_sol = findroot(f2,start_val, tol = 0.0001,solver='halley')
-            #a_sol = findroot(f2,start_val,solver='anderson')
-            #start_val = a_sol
-            #a_sol = 1
-
 
             if verbose:
-              print('a_sol', a_sol)
-              input()
+                print 'a_sol', a_sol
+                raw_input()
 
             a_i.append(a_sol)
 
@@ -159,36 +136,36 @@ class PolyEvents(FitnessFunc):
         lamb = (N_k)/((M_k)*(1-a_i*(M_k)/2.0))
         lamb = np.where(np.isinf(a_i),1,lamb) #if a is inf, lambda is 0
         if verbose:
-          print('calculating lambda')
-          print('a_i',a_i)
-          print('N_k',N_k)
-          print('M_k',M_k)
-          print('lamb', lamb)
+            print 'calculating lambda'
+            print 'a_i',a_i
+            print 'N_k',N_k
+            print 'M_k',M_k
+            print 'lamb', lamb
         loglamb = np.log(lamb)
         if np.any(np.isnan(loglamb)):
-          print('loglamb nan, man:',loglamb)
+            print 'loglamb nan, man:',loglamb
         #loglamb = np.where(np.isnan(loglamb),-100,loglamb)
         #print 'lamb',lamb, loglamb
         #raw_input()
         logsum = []
         for i in range(len(N_i)):
-          logsum.append(np.sum(np.log(1+(a_i[i])*(N_i[i:-1]-N_i[-1])))+np.log(1))
+            logsum.append(np.sum(np.log(1+(a_i[i])*(N_i[i:-1]-N_i[-1])))+np.log(1))
         logsum = np.asarray(logsum)
         if verbose:
-          print('calculating logsum')
-          print('a_i',a_i)
-          print('N_i',N_i)
-          print('logsum',logsum)
-          print('slope (lambda*a)', lamb*a_i)
-          print('y_in', lamb*(1-a_i*M_k))
-          print('y_fin', lamb)
+            print 'calculating logsum'
+            print 'a_i',a_i
+            print 'N_i',N_i
+            print 'logsum',logsum
+            print 'slope (lambda*a)', lamb*a_i
+            print 'y_in', lamb*(1-a_i*M_k)
+            print 'y_fin', lamb
         if np.any(np.isnan(logsum)):
-          print(a_i, N_i[:-1],N_i[-1])
-          print('logsum nan:',1+(a_i[i])*(N_i[i:-1]-N_i[-1]))
+            print a_i, N_i[:-1],N_i[-1]
+            print 'logsum nan:',1+(a_i[i])*(N_i[i:-1]-N_i[-1])
         #return N_k * loglamb + N_k * np.where(np.isnan(logsum),-100,logsum) - N_k
         y_in = lamb*(1-a_i*M_k)
         y_fin = lamb
-        return ((N_k) * loglamb + (N_k) * logsum, y_in, y_fin)
+        return (N_k) * loglamb + (N_k) * logsum
         #return (N_k+1) * logsum
         #return (lamb**N_k+np.prod(1+a_i*(N_i-N_i[-1])))/10.0**100
 
@@ -202,8 +179,107 @@ class PolyEvents(FitnessFunc):
             # eq. 21 from Scargle 2012
             return 4 - np.log(73.53 * self.p0 * (N ** -0.478))
 
+class Events(FitnessFunc):
+    """Fitness for binned or unbinned events
+
+    Parameters
+    ----------
+    p0 : float
+        False alarm probability, used to compute the prior on N
+        (see eq. 21 of Scargle 2012).  Default prior is for p0 = 0.
+    gamma : float or None
+        If specified, then use this gamma to compute the general prior form,
+        p ~ gamma^N.  If gamma is specified, p0 is ignored.
+    """
+    def fitness(self, N_k, T_k):
+        # eq. 19 from Scargle 2012
+        #print 'N_k',N_k
+        #print 'T_k',T_k
+        return N_k * (np.log(N_k) - np.log(T_k))
+
+    def prior(self, N, Ntot):
+        if self.gamma is not None:
+            return self.gamma_prior(N, Ntot)
+        else:
+            # eq. 21 from Scargle 2012
+            return 4 - np.log(73.53 * self.p0 * (N ** -0.478))
+            #return 3000 - np.log(73.53 * self.p0 * (N ** -0.478))
+
+
+
+class RegularEvents(FitnessFunc):
+    """Fitness for regular events
+
+    This is for data which has a fundamental "tick" length, so that all
+    measured values are multiples of this tick length.  In each tick, there
+    are either zero or one counts.
+
+    Parameters
+    ----------
+    dt : float
+        tick rate for data
+    gamma : float
+        specifies the prior on the number of bins: p ~ gamma^N
+    """
+    def __init__(self, dt, p0=0.05, gamma=None):
+        self.dt = dt
+        self.p0 = p0
+        self.gamma = gamma
+
+    def validate_input(self, t, x, sigma):
+        unique_x = np.unique(x)
+        if list(unique_x) not in ([0], [1], [0, 1]):
+            raise ValueError("Regular events must have only 0 and 1 in x")
+
+    def fitness(self, T_k, N_k):
+        # Eq. 75 of Scargle 2012
+        M_k = T_k / self.dt
+        N_over_M = N_k * 1. / M_k
+
+        eps = 1E-8
+        if np.any(N_over_M > 1 + eps):
+            import warnings
+            warnings.warn('regular events: N/M > 1.  '
+                          'Is the time step correct?')
+
+        one_m_NM = 1 - N_over_M
+        N_over_M[N_over_M <= 0] = 1
+        one_m_NM[one_m_NM <= 0] = 1
+
+        return N_k * np.log(N_over_M) + (M_k - N_k) * np.log(one_m_NM)
+
+
+class PointMeasures(FitnessFunc):
+    """Fitness for point measures
+
+    Parameters
+    ----------
+    gamma : float
+        specifies the prior on the number of bins: p ~ gamma^N
+        if gamma is not specified, then a prior based on simulations
+        will be used (see sec 3.3 of Scargle 2012)
+    """
+    def __init__(self, p0=None, gamma=None):
+        self.p0 = p0
+        self.gamma = gamma
+
+    def fitness(self, a_k, b_k):
+        # eq. 41 from Scargle 2012
+        return (b_k * b_k) / (4 * a_k)
+
+    def prior(self, N, Ntot):
+        if self.gamma is not None:
+            return self.gamma_prior(N, Ntot)
+        elif self.p0 is not None:
+            return self.p0_prior(N, Ntot)
+        else:
+            # eq. at end of sec 3.3 in Scargle 2012
+            return 1.32 + 0.577 * np.log10(N)
+
+
 def bayesian_blocks(t, x=None, sigma=None,
-                    fitness='poly_events', gamma=None, p0=0.05):
+                    #fitness='poly_events', **kwargs):
+                    fitness='events', gamma=None, p0=0.05):
     """Bayesian Blocks Implementation
 
     This is a flexible implementation of the Bayesian Blocks algorithm
@@ -289,10 +365,22 @@ def bayesian_blocks(t, x=None, sigma=None,
         sigma = np.asarray(sigma)
 
     # verify the fitness function
-    if fitness == 'poly_events':
+    if fitness == 'events':
+        #if x is not None and np.any(x % 1 > 0):
+        #    raise ValueError("x must be integer counts for fitness='events'")
+        fitfunc = Events(p0,gamma)
+    elif fitness == 'poly_events':
         if x is not None and np.any(x % 1 > 0):
             raise ValueError("x must be integer counts for fitness='events'")
         fitfunc = PolyEvents(p0,gamma)
+    elif fitness == 'regular_events':
+        if x is not None and (np.any(x % 1 > 0) or np.any(x > 1)):
+            raise ValueError("x must be 0 or 1 for fitness='regular_events'")
+        fitfunc = RegularEvents(**kwargs)
+    elif fitness == 'measures':
+        if x is None:
+            raise ValueError("x must be specified for fitness='measures'")
+        fitfunc = PointMeasures(p0,gamma)
     else:
         if not (hasattr(fitness, 'args') and
                 hasattr(fitness, 'fitness') and
@@ -301,7 +389,7 @@ def bayesian_blocks(t, x=None, sigma=None,
         fitfunc = fitness
 
     # find unique values of t
-    t = np.array(t, dtype=float)
+    t = np.array(t, dtype=np.float64)
     assert t.ndim == 1
     unq_t, unq_ind, unq_inv = np.unique(t, return_index=True,
                                         return_inverse=True)
@@ -365,10 +453,8 @@ def bayesian_blocks(t, x=None, sigma=None,
     #-----------------------------------------------------------------
     # Start with first data cell; add one cell at each iteration
     #-----------------------------------------------------------------
-    y_fin_prev = 0
-    cont_diff = 0
     for R in range(N):
-        print(R, t[R])
+        #print R, t[R]
         # Compute fit_vec : fitness of putative last block (end at R)
         kwds = {}
 
@@ -403,28 +489,24 @@ def bayesian_blocks(t, x=None, sigma=None,
           #kwds['N_i'] = block_length[:R+1]
 
         # evaluate fitness function
-        (fit_vec,y_in,y_fin) = fitfunc.fitness(**kwds)
-        if R>1:
-          cont_diff = np.abs(y_fin_prev - y_in)
-          cont_diff[np.isnan(cont_diff)]=1e20
+        fit_vec = fitfunc.fitness(**kwds)
+        #if np.any(np.isnan(fit_vec)):
+        #  raise Exception('fuck! nans! logs of negs!')
+        #if np.any(np.isinf(fit_vec)):
+        #  raise Exception('shit! infs! what the hell?!')
+        #print 'fit_vec', fit_vec
 
-        y_fin_prev = np.concatenate([y_fin,[0]])
-        print('y_in', y_in)
-        print('y_fin', y_fin)
-        print('cont_diff',cont_diff)
-        print('cont_diff exp',np.exp(cont_diff))
-
-        A_R = fit_vec - fitfunc.prior(R + 1, N) - np.exp(cont_diff)**2
+        A_R = fit_vec - fitfunc.prior(R + 1, N)
         #A_R = fit_vec
-        print('A_R', A_R)
+        #print 'A_R', A_R
         A_R[1:] += best[:R]
-        print('A_R after best', A_R)
+        #print 'A_R after best', A_R
 
         i_max = np.argmax(A_R)
         last[R] = i_max
         best[R] = A_R[i_max]
-        print('last:',last)
-        print('best:',best)
+        #print 'last:',last
+        #print 'best:',best
         #raw_input()
 
     #-----------------------------------------------------------------
@@ -440,8 +522,8 @@ def bayesian_blocks(t, x=None, sigma=None,
             break
         ind = last[ind - 1]
     change_points = change_points[i_cp:]
-    change_points[-1] = change_points[-1]-1 # temp line for using t instead of edges
-    print('change_points',change_points)
+    #change_points[-1] = change_points[-1]-1 # temp line for using t instead of edges
+    #print 'change_points',change_points
 
-    #return edges[change_points]
-    return t[change_points]
+    return edges[change_points]
+    #return t[change_points]

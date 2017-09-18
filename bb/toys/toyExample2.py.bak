@@ -1,13 +1,11 @@
 #! /usr/bin/env python
 
 #from bayesianBlocks import *
-from __future__ import absolute_import
-from __future__ import print_function
 import numpy as np
 from hist_tools_modified import hist
 import matplotlib.pyplot as plt
 import pandas as pd
-import six.moves.cPickle as pkl
+import cPickle as pkl
 import os
 from scipy.stats import powerlaw
 from scipy.stats import triang
@@ -70,7 +68,7 @@ def generateToy():
   #plt.plot(x[11:],pdf[11:])
   #hist(nd[11:],'blocks',fitness='poly_events',p0=0.05,histtype='bar',alpha=0.2,label='b blocks',ax=ax,normed=True)
 
-  print(nd)
+  print nd
   plt.plot(nd,len(nd)*[1],"x")
   #plt.plot(x,pdf)
   hist(nd,'blocks',fitness='poly_events',p0=0.05,histtype='bar',alpha=0.2,label='b blocks',ax=ax)

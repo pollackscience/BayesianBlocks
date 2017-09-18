@@ -1,19 +1,16 @@
 #! /usr/bin/env python
 
 from __future__ import division
-from __future__ import absolute_import
-from __future__ import print_function
 import os
 import functools
 # from scipy.stats import norm
-import six.moves.cPickle as pkl
+import cPickle as pkl
 from matplotlib import pyplot as plt
 import nllfitter.future_fitter as ff
 from ROOT import gRandom
 from ROOT import TF1
 from tqdm import tqdm_notebook
 import bh_comp as bh_tools
-from six.moves import range
 
 
 if __name__ == "__main__":
@@ -39,7 +36,7 @@ if __name__ == "__main__":
     sig_pdf_ROOT = functools.partial(bh_tools.sig_pdf, doROOT=True)
     tf1_sig_pdf = TF1("tf1_sig_pdf", sig_pdf_ROOT, 2800, 13000, 2)
     n_toys = 10000
-    xlows = list(range(3200, 7000, 100))
+    xlows = range(3200, 7000, 100)
 
     for i, sig_p in enumerate(tqdm_notebook(sig_params, desc='Signal Model')):
 
@@ -49,7 +46,7 @@ if __name__ == "__main__":
 
             cache_fit = {}
             cnc_A_mle = []
-            for j in tqdm_notebook(range(n_toys), desc='Toys', leave=False):
+            for j in tqdm_notebook(xrange(n_toys), desc='Toys', leave=False):
 
                 # mc_bg = gen_toy(n_bg)
                 mc_bg = gen_toy(500)
@@ -65,4 +62,4 @@ if __name__ == "__main__":
             a95s.append(a_95)
 
         best_xlow = xlows[a95s.index(min(a95s))]
-        print('signal:', i, 'a95:', min(a95s), 'xlow_cut:', best_xlow)
+        print 'signal:', i, 'a95:', min(a95s), 'xlow_cut:', best_xlow

@@ -1,10 +1,8 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 from __future__ import division
-from __future__ import absolute_import
-from __future__ import print_function
 import os
-import six.moves.cPickle as pkl
+import cPickle as pkl
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
@@ -31,7 +29,7 @@ def fancy_plots(bin_style='bb'):
         be[0] = xlims[0]
         be[-1] = xlims[1]
         bin_centers = (be[1:]+be[:-1])/2
-        print(len(bin_centers))
+        print len(bin_centers)
     else:
         _, be = np.histogram(data_shifted, 20, range=xlims)
         bin_centers = (be[1:]+be[:-1])/2
@@ -47,8 +45,8 @@ def fancy_plots(bin_style='bb'):
     fig.subplots_adjust(hspace=0.001)
     ax1.set_xlim(xlims)
 
-    print('lims')
-    print(z_data.Mll.min(), z_data.Mll.max())
+    print 'lims'
+    print z_data.Mll.min(), z_data.Mll.max()
     bc_d_bw, _, _  = hist(data_shifted, ax=ax1, bins=be, scale='binwidth', histtype='marker',
                           markersize=10, color='k', errorbars=True, label='Shifted')
 
@@ -104,7 +102,7 @@ def fancy_plots_pt(bin_style='bb'):
         be[0] = xlims[0]
         be[-1] = xlims[1]
         bin_centers = (be[1:]+be[:-1])/2
-        print(len(bin_centers))
+        print len(bin_centers)
     else:
         _, be = np.histogram(pt_data.leading_jet_pT, 15, range=xlims)
         bin_centers = (be[1:]+be[:-1])/2
@@ -124,8 +122,8 @@ def fancy_plots_pt(bin_style='bb'):
     ax1.set_xlim(xlims)
     # ax1.set_ylim(ymin=1e-6, ymax=1e3)
 
-    print('lims')
-    print(pt_data.leading_jet_pT.min(), pt_data.leading_jet_pT.max())
+    print 'lims'
+    print pt_data.leading_jet_pT.min(), pt_data.leading_jet_pT.max()
     bc_d, _, _  = hist(pt_data.leading_jet_pT, ax=ax1, bins=be, scale='binwidth',
                        histtype='marker', markersize=10, color='k', errorbars=True, label='Data')
 
@@ -175,7 +173,7 @@ def simple_binning():
     z_data = pkl.load(open(bb_dir+'/files/DY/Linear.p', "rb"))
     n_events = 100000
     be = bayesian_blocks(z_data[0:n_events].Mll_gen, p0=0.01)
-    print(be)
+    print be
     hist(z_data[0:n_events].Mll_gen, bins=170, scale='binwidth', histtype='stepfilled', alpha=0.2,
          label='1 GeV', range=xlims)
     hist(z_data[0:n_events].Mll_gen, bins=be, scale='binwidth', histtype='step', color='red',

@@ -1,7 +1,4 @@
-from __future__ import absolute_import
-from __future__ import print_function
 import numpy as np
-from six.moves import range
 
 def bayesian_blocks(t,n_prior=4):
     """Bayesian Blocks Implementation
@@ -44,7 +41,7 @@ def bayesian_blocks(t,n_prior=4):
     # Start with first data cell; add one cell at each iteration
     #-----------------------------------------------------------------
     for K in range(N):
-        if K%1000==0: print(K)
+        if K%1000==0: print K
         # Compute the width and count of the final bin for all possible
         # locations of the K^th changepoint
         width = block_length[:K + 1] - block_length[K + 1]
