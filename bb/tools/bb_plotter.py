@@ -5,7 +5,7 @@ from __future__ import absolute_import
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
-from .hist_tools_modified import hist
+from histogram_plus import hist
 from .fill_between_steps import fill_between_steps
 from matplotlib.ticker import MaxNLocator
 
@@ -18,6 +18,7 @@ from .bayesian_blocks_modified import bayesian_blocks
 from plotly.offline import download_plotlyjs, init_notebook_mode, iplot, plot
 import plotly.graph_objs as go
 import plotly.plotly as py
+from collections import Iterable
 
 def make_hist_ratio_blackhole(bin_edges, data, mc, data_err, label, suffix = None, bg_est='data_driven', signal=None, mode='no_signal'):
     bin_centres = (bin_edges[:-1] + bin_edges[1:])/2.
@@ -265,24 +266,38 @@ def make_comp_plots(data, p0, save_dir,title='Plot of thing vs thing', xlabel='X
     #plot_html = new_iplot(fig,show_link=False)
     #plot(fig,filename = save_dir+save_name+'.html')
 
-def make_bb_plot(data, p0, save_dir, range=None,title='Plot of thing vs thing', xlabel='X axis', ylabel='Y axis',save_name='plot', overlay_reg_bins = True, edges=None,scale=None, bins=80):
+def make_bb_plot(data, p0, save_dir, range=None,title='Plot of thing vs thing', xlabel='X axis',
+                 ylabel='Y axis',save_name='plot', overlay_reg_bins = True, edges=None,scale=None,
+                 bins=80, hist_label1='Uniform Binning', hist_label2='Bayesian Blocks', color=None):
 
     normed=False
     if scale=='normed':
         normed=True
         scale=None
 
+    if isinstance(data[0], Iterable):
+        comb_data = np.concatenate(data)
+    else:
+        comb_data = data
+
     if edges != None:
         bb_edges=edges
     else:
-        bb_edges = bayesian_blocks(data,p0=p0)
+        bb_edges = bayesian_blocks(comb_data,p0=p0)
     plt.figure()
     #bin_content = np.histogram(data,bb_edges,density=True)[0]
     #plt.yscale('log', nonposy='clip')
 
-    hist(data,bins=bins,range=range,histtype='stepfilled',alpha=0.2,label='{} bins'.format(bins),normed=normed,scale=scale)
+    if isinstance(data[0], Iterable):
+        hist(data,bins=bins,range=range,histtype='stepfilled', label=hist_label1,
+             normed=normed,scale=scale, stacked=True, color=color)
+    else:
+        hist(data,bins=bins,range=range,histtype='stepfilled', label=hist_label1,
+             normed=normed,scale=scale, color=color)
     #hist(data,bins=100,histtype='stepfilled',alpha=0.2,label='100 bins',normed=False)
-    bb_content, bb_edges,_ = hist(data,bins=bb_edges,range=range,histtype='step',linewidth=2.0,color='crimson',label='b blocks',normed=normed,scale=scale)
+    bb_content, bb_edges, _ = hist(
+        comb_data,bins=bb_edges,range=range,histtype='step',alpha=1,color='crimson', linewidth=3,
+        label=hist_label2, normed=normed,scale=scale)
     #fill_between_steps(plt.gca(), bb_edges, bin_content*len(data),bin_content*len(data)/2, alpha=0.5, step_where='pre',linewidth=2,label='norm attempt')
     plt.legend()
     plt.xlabel(xlabel)
@@ -331,25 +346,32 @@ def make_bb_plot_v2(data, p0, save_dir, hrange=None,title='Plot of thing vs thin
 
 
 def make_fit_plot(data, bins, range, frozen_pdf, title, xlabel='M (GeV)', ylabel='Count',
-                  hist_label = 'hist', pdf_label = 'pdf', extra_pdf_tuple=None, textstr=None, ax=None):
+                  hist_label = 'hist', pdf_label = 'pdf', extra_pdf_tuple=None, textstr=None,
+                  ax=None, color=None):
     x       = np.linspace(range[0], range[1], 10000)
     binning = (range[1]-range[0])/bins
     if not ax:
         plt.figure()
         ax = plt.subplot()
-    plt.hist(data, bins, range=range, alpha=0.2, histtype='stepfilled', label=hist_label)
-    plt.plot(x, (len(data)*binning)*frozen_pdf(x), linewidth=2, label=pdf_label)
+    if isinstance(data[0], Iterable):
+        n_tot = sum(len(i) for i in data)
+        hist(data, bins, range=range, histtype='stepfilled', label=hist_label, color=color,
+             stacked=True)
+    else:
+        n_tot = len(data)
+        hist(data, bins, range=range, histtype='stepfilled', label=hist_label, color=color)
+    plt.plot(x, (n_tot*binning)*frozen_pdf(x), linewidth=3, label=pdf_label, color='C3')
     if extra_pdf_tuple != None:
         '''extra_pdf_tuple = (extra_frozen_pdf, extra_scale, extra_label)'''
-        plt.plot(x, (len(data)*binning*extra_pdf_tuple[1])*extra_pdf_tuple[0](x), 'k--', label=extra_pdf_tuple[2])
+        plt.plot(x, (n_tot*binning*extra_pdf_tuple[1])*extra_pdf_tuple[0](x), 'k--', label=extra_pdf_tuple[2])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.title(title)
     plt.legend()
     if textstr:
-        props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+        props = dict(boxstyle='round', facecolor='none', alpha=0.5)
         # plt.text(0.85, 0.8, textstr, transform=plt.gca().transAxes, fontsize=14,
         #     verticalalignment='top', bbox=props)
-        plt.text(0.86, 0.7, textstr, transform=plt.gca().transAxes, fontsize=16,
+        plt.text(0.84, 0.7, textstr, transform=plt.gca().transAxes, fontsize=16,
             verticalalignment='top', bbox=props)
     return ax

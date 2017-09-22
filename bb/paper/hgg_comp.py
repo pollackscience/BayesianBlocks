@@ -10,7 +10,7 @@ import numpy as np
 from scipy.stats import norm
 import scipy.integrate as integrate
 from scipy.stats import poisson
-import six.moves.cPickle as pkl
+import pandas as pd
 from matplotlib import pyplot as plt
 # from lmfit import Model
 from lmfit import Parameters
@@ -19,7 +19,7 @@ from bb.tools.bayesian_blocks_modified import bayesian_blocks
 from nllfit import NLLFitter, Model
 from ROOT import gRandom
 from ROOT import TF1
-from tqdm import tqdm_notebook
+from tqdm import tqdm_notebook, tnrange
 from six.moves import range
 
 
@@ -332,9 +332,12 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
             ('a3', 0., True, -1, 1, None, None)
         )
     else:
-        _bg_params = bg_params.copy()
-        for p in _bg_params:
-            _bg_params[p].vary=False
+        _bg_params = Parameters()
+        _bg_params.add_many(
+            ('a1', bg_params[0], False, -1, 1, None, None),
+            ('a2', bg_params[1], False, -1, 1, None, None),
+            ('a3', bg_params[2], False, -1, 1, None, None)
+        )
 
     bg_model = Model(bg_pdf, _bg_params)
 
@@ -349,21 +352,35 @@ def generate_q0_via_nll_unbinned(data, bg_params=None, sig_params=None):
             ('a3'    , 0.  , True , -1  , 1   , None , None)
         )
     else:
-        _sig_params = sig_params.copy()
-        for p in _sig_params:
-            _sig_params[p].vary=False
-
-        if len(_sig_params) == 5:
-            _sig_params.add('C', 0.1, True, 0, 1)
+        if len(sig_params) == 5:
+            _sig_params = Parameters()
+            _sig_params.add_many(
+                ('C'     , 0.1 , True , 0   , 1   , None , None) ,
+                ('mu'    , sig_params[0], False, 120 , 130 , None , None) ,
+                ('sigma' , sig_params[1], False , 1   , 4   , None , None) ,
+                ('a1'    , sig_params[2], False , -1  , 1   , None , None) ,
+                ('a2'    , sig_params[3], False , -1  , 1   , None , None) ,
+                ('a3'    , sig_params[4], False , -1  , 1   , None , None)
+            )
+        else:
+            _sig_params = Parameters()
+            _sig_params.add_many(
+                ('C'     , sig_params[0] , False, 0   , 1   , None , None) ,
+                ('mu'    , sig_params[1], False, 120 , 130 , None , None) ,
+                ('sigma' , sig_params[2], False , 1   , 4   , None , None) ,
+                ('a1'    , sig_params[3], False , -1  , 1   , None , None) ,
+                ('a2'    , sig_params[4], False , -1  , 1   , None , None) ,
+                ('a3'    , sig_params[5], False , -1  , 1   , None , None)
+            )
 
     bg_sig_model = Model(bg_sig_pdf, _sig_params)
 
-    mc_bg_only_fitter = NLLFitter(bg_model, verbose=False)
-    mc_bg_only_result = mc_bg_only_fitter.fit(np.asarray(data), calculate_corr=False)
+    mc_bg_only_fitter = NLLFitter(bg_model)
+    mc_bg_only_result = mc_bg_only_fitter.fit(np.asarray(data), calculate_corr=False, verbose=False)
     bg_nll = mc_bg_only_result.fun
 
-    mc_bg_sig_fitter = NLLFitter(bg_sig_model, verbose=False)
-    mc_bg_sig_result = mc_bg_sig_fitter.fit(np.asarray(data), calculate_corr=False)
+    mc_bg_sig_fitter = NLLFitter(bg_sig_model)
+    mc_bg_sig_result = mc_bg_sig_fitter.fit(np.asarray(data), calculate_corr=False, verbose=False)
     bg_sig_nll = mc_bg_sig_result.fun
     q0 = 2*max(bg_nll-bg_sig_nll, 0)
     return q0
@@ -375,13 +392,16 @@ def generate_q0_via_nll_unbinned_constrained(bg, data, bg_params):
 
     data = np.asarray(data)
     bg = np.asarray(bg)
-    _bg_params = bg_params.copy()
-    for p in _bg_params:
-        _bg_params[p].vary=False
+    _bg_params = Parameters()
+    _bg_params.add_many(
+        ('a1', bg_params[0], False, -1, 1, None, None),
+        ('a2', bg_params[1], False, -1, 1, None, None),
+        ('a3', bg_params[2], False, -1, 1, None, None)
+    )
 
     bg_model = Model(bg_pdf, _bg_params)
-    mc_bg_only_fitter = NLLFitter(bg_model, verbose=False)
-    mc_bg_only_fitter.fit(bg, calculate_corr=False)
+    mc_bg_only_fitter = NLLFitter(bg_model)
+    mc_bg_only_fitter.fit(bg, calculate_corr=False, verbose=False)
 
     bg_nll = bg_model.calc_nll(None, data)
 
@@ -397,8 +417,8 @@ def generate_q0_via_nll_unbinned_constrained(bg, data, bg_params):
 
     bg_sig_model = Model(bg_sig_pdf, _sig_params)
 
-    mc_bg_sig_fitter = NLLFitter(bg_sig_model, verbose=False)
-    mc_bg_sig_result = mc_bg_sig_fitter.fit(data, calculate_corr=False)
+    mc_bg_sig_fitter = NLLFitter(bg_sig_model)
+    mc_bg_sig_result = mc_bg_sig_fitter.fit(data, calculate_corr=False, verbose=False)
     bg_sig_nll = mc_bg_sig_result.fun
     q0 = 2*max(bg_nll-bg_sig_nll, 0)
 
@@ -432,19 +452,19 @@ def generate_q0_via_shape_fit(data, bin_edges, template_params, template_pdf):
     bc, bin_edges = np.histogram(data, bin_edges, range=(100, 180))
 
     _template_params = template_params.copy()
-    _template_params.n_tot.value = n_tot
+    _template_params['n_tot'].value = n_tot
     template_model = Model(template_pdf, _template_params)
-    template_fitter = NLLFitter(template_model, verbose=False)
-    mle_res = template_fitter.fit(bc, calculate_corr=False)
+    template_fitter = NLLFitter(template_model)
+    mle_res = template_fitter.fit(bc, calculate_corr=False, verbose=False)
     nll_sig = mle_res.fun
 
     _template_params = template_params.copy()
-    _template_params.n_tot.value = n_tot
-    _template_params.A.value = 0
-    _template_params.A.vary = False
+    _template_params['n_tot'].value = n_tot
+    _template_params['A'].value = 0
+    _template_params['A'].vary = False
     template_model = Model(template_pdf, _template_params)
-    template_fitter = NLLFitter(template_model, verbose=False)
-    bg_res = template_fitter.fit(bc, calculate_corr=False)
+    template_fitter = NLLFitter(template_model)
+    bg_res = template_fitter.fit(bc, calculate_corr=False, verbose=False)
     nll_bg = bg_res.fun
 
     q0 = 2*(nll_bg-nll_sig)
@@ -455,8 +475,8 @@ if __name__ == "__main__":
     plt.close('all')
     current_dir = os.path.dirname(__file__)
     bb_dir      = os.path.join(current_dir, '../..')
-    hgg_bg      = pkl.load(open(bb_dir+'/files/hgg_bg.p', "rb"))
-    hgg_signal  = pkl.load(open(bb_dir+'/files/hgg_signal.p', "rb"))
+    hgg_bg      = pd.read_pickle(bb_dir+'/files/hgg_bg.p')
+    hgg_signal  = pd.read_pickle(bb_dir+'/files/hgg_signal.p')
 
     bg_result, sig_result, n_bg, n_sig, be_bg, be_sig = generate_initial_params(
         hgg_bg, hgg_signal, 5)
@@ -495,7 +515,7 @@ if __name__ == "__main__":
     template_params = Parameters()
     template_params.add_many(
         ('A'    , 0.    , True  , 0    , 1    , None , None) ,
-        ('ntot' , n_tot , False , None , None , None , None)
+        ('n_tot' , n_tot , False , None , None , None , None)
     )
 
 
@@ -553,7 +573,7 @@ if __name__ == "__main__":
     # Do a bunch of toys
     gRandom.SetSeed(20)
 
-    for i in tqdm_notebook(list(range(1000))):
+    for i in tnrange(1000):
         mc_bg, mc_sig = generate_toy_data(tf1_bg_pdf, tf1_sig_pdf, n_bg, n_sig)
         mc_bg_sig = mc_bg+mc_sig
 
