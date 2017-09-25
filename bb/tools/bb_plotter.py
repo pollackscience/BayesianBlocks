@@ -347,7 +347,7 @@ def make_bb_plot_v2(data, p0, save_dir, hrange=None,title='Plot of thing vs thin
 
 def make_fit_plot(data, bins, range, frozen_pdf, title, xlabel='M (GeV)', ylabel='Count',
                   hist_label = 'hist', pdf_label = 'pdf', extra_pdf_tuple=None, textstr=None,
-                  ax=None, color=None):
+                  ax=None, color=None, alpha=0.5, pdf_color='C3', pdf_line='-'):
     x       = np.linspace(range[0], range[1], 10000)
     binning = (range[1]-range[0])/bins
     if not ax:
@@ -356,11 +356,13 @@ def make_fit_plot(data, bins, range, frozen_pdf, title, xlabel='M (GeV)', ylabel
     if isinstance(data[0], Iterable):
         n_tot = sum(len(i) for i in data)
         hist(data, bins, range=range, histtype='stepfilled', label=hist_label, color=color,
-             stacked=True)
+             stacked=True, alpha=alpha)
     else:
         n_tot = len(data)
-        hist(data, bins, range=range, histtype='stepfilled', label=hist_label, color=color)
-    plt.plot(x, (n_tot*binning)*frozen_pdf(x), linewidth=3, label=pdf_label, color='C3')
+        hist(data, bins, range=range, histtype='stepfilled', label=hist_label, color=color,
+             alpha=alpha)
+    plt.plot(x, (n_tot*binning)*frozen_pdf(x), linewidth=3, label=pdf_label, color=pdf_color,
+             linestyle=pdf_line)
     if extra_pdf_tuple != None:
         '''extra_pdf_tuple = (extra_frozen_pdf, extra_scale, extra_label)'''
         plt.plot(x, (n_tot*binning*extra_pdf_tuple[1])*extra_pdf_tuple[0](x), 'k--', label=extra_pdf_tuple[2])
