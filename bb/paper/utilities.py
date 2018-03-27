@@ -1,17 +1,19 @@
 #! /usr/bin/env python3
 
 import numpy as np
+import pandas as pd
 
 
 def rough(hist):
     '''Determine the roughness of a histogram by calculating the 2nd order forward finite diff'''
 
-    total = np.sum(hist[0])
     widths = np.diff(hist[1])
     cd = (widths[:-1]+widths[1:])/2
     cd2 = cd[:-1]+cd[1:]
-    f = hist[0]/(total*widths)
+    # f = np.log(hist[0]+1e-15)
+    f = hist[0]
     fdp = (f[2:]-2*f[1:-1]+f[:-2])/(cd[:-1]*cd[1:])
+    # fdp = (f[2:]-2*f[1:-1]+f[:-2])/(widths[:-2]*widths[2:])
     rough = np.sum(fdp**2*cd2)
     return rough
 
@@ -36,3 +38,24 @@ def err_li(input_data, hist):
     nn_data = np.concatenate(nn_data)
     # print(list(zip(np.asarray(nn_data), np.sort(input_data))))
     return np.sum(np.abs(np.asarray(nn_data)-np.sort(input_data)))
+
+
+def bep_optimizer(data):
+    best_rough = np.inf
+    best_bep = 0
+    for nb in range(12, int(np.sqrt(len(data)))):
+        _, bep = pd.qcut(data, nb, retbins=True)
+        tmp_hist_ep = np.histogram(data, bins=bep)
+        tmp_hist_ep_bw = tmp_hist_ep[0]/np.diff(tmp_hist_ep[1])
+        tmp_rough = rough((tmp_hist_ep_bw, tmp_hist_ep[1]))
+        if tmp_rough < best_rough:
+            best_bep = bep
+            best_rough = tmp_rough
+    print(best_bep)
+    return best_bep
+
+
+def normalized(a):
+    norm1 = (a - min(a))/(max(a)-min(a))
+    print(norm1)
+    return norm1
