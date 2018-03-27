@@ -55,6 +55,21 @@ def bep_optimizer(data):
     return best_bep
 
 
+def bb_optimizer(data):
+    best_metric = np.inf
+    best_p0 = 0
+    p0s = [0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01, 0.001, 0.0001]
+    for p0 in p0s:
+        tmp_hist_ep = np.histogram(data, bins=bep)
+        tmp_hist_ep_bw = tmp_hist_ep[0]/np.diff(tmp_hist_ep[1])
+        tmp_rough = rough((tmp_hist_ep_bw, tmp_hist_ep[1]))
+        if tmp_rough < best_rough:
+            best_bep = bep
+            best_rough = tmp_rough
+    print(best_bep)
+    return best_bep
+
+
 def normalized(a):
     norm1 = (a - min(a))/(max(a)-min(a))
     print(norm1)
