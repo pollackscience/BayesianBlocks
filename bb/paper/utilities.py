@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from skhep.modeling import bayesian_blocks
 
 
 def rough(hist):
@@ -40,37 +41,67 @@ def err_li(input_data, hist):
     return np.sum(np.abs(np.asarray(nn_data)-np.sort(input_data)))
 
 
-def bep_optimizer(data):
-    best_rough = np.inf
+def avg_err_li(hist, n_events, n_resamples, input_data=None, input_dist=None):
+    if not (np.all(input_data) or input_dist):
+        raise ValueError('input_data or input_dist must be defined')
+    if (np.all(input_data) and input_dist):
+        raise ValueError('only input_data or input_dist can be defined')
+
+    err_li_list = []
+    if np.all(input_data):
+        for i in range(n_resamples-1):
+            err_li_list.append(err_li(input_data[i*n_events:n_events*(i+1)], hist))
+
+    elif input_dist:
+        for i in range(n_resamples-1):
+            err_li_list.append(err_li(input_dist(size=n_events), hist))
+
+    return np.mean(err_li_list)
+
+
+def bep_optimizer(data, n_resamples, resample_data, roughs, elis):
+    best_metric = np.inf
     best_bep = 0
-    for nb in range(12, int(np.sqrt(len(data)))):
+    for nb in range(3, int(np.sqrt(len(data)))):
         _, bep = pd.qcut(data, nb, retbins=True)
-        tmp_hist_ep = np.histogram(data, bins=bep)
-        tmp_hist_ep_bw = tmp_hist_ep[0]/np.diff(tmp_hist_ep[1])
-        tmp_rough = rough((tmp_hist_ep_bw, tmp_hist_ep[1]))
-        if tmp_rough < best_rough:
+        tmp_hist = np.histogram(data, bins=bep)
+        tmp_hist_bw = tmp_hist[0]/np.diff(tmp_hist[1])
+        tmp_rough = rough((tmp_hist_bw, tmp_hist[1]))
+        tmp_eli = avg_err_li(tmp_hist, len(data), n_resamples, input_data=resample_data)
+
+        norm_rough = normalized(roughs + [tmp_rough])
+        norm_eli = normalized(elis + [tmp_eli])
+        tmp_metric = norm_eli[-1] + norm_rough[-1]
+        # print(p0, tmp_metric)
+
+        if tmp_metric < best_metric:
             best_bep = bep
-            best_rough = tmp_rough
-    print(best_bep)
+            best_metric = tmp_metric
     return best_bep
 
 
-def bb_optimizer(data):
+def bb_optimizer(data, n_resamples, resample_data, roughs, elis):
     best_metric = np.inf
     best_p0 = 0
-    p0s = [0.5, 0.4, 0.3, 0.2, 0.1, 0.05, 0.01, 0.001, 0.0001]
+    p0s = np.logspace(-3, 0, 25)
     for p0 in p0s:
-        tmp_hist_ep = np.histogram(data, bins=bep)
-        tmp_hist_ep_bw = tmp_hist_ep[0]/np.diff(tmp_hist_ep[1])
-        tmp_rough = rough((tmp_hist_ep_bw, tmp_hist_ep[1]))
-        if tmp_rough < best_rough:
-            best_bep = bep
-            best_rough = tmp_rough
-    print(best_bep)
-    return best_bep
+        bb = bayesian_blocks(data, p0=p0)
+        tmp_hist = np.histogram(data, bins=bb)
+        tmp_hist_bw = tmp_hist[0]/np.diff(tmp_hist[1])
+        tmp_rough = rough((tmp_hist_bw, tmp_hist[1]))
+        tmp_eli = avg_err_li(tmp_hist, len(data), n_resamples, input_data=resample_data)
+
+        norm_rough = normalized(roughs + [tmp_rough])
+        norm_eli = normalized(elis + [tmp_eli])
+        tmp_metric = norm_eli[-1] + norm_rough[-1]
+        # print(p0, tmp_metric)
+
+        if tmp_metric < best_metric:
+            best_p0 = p0
+            best_metric = tmp_metric
+    return best_p0
 
 
 def normalized(a):
     norm1 = (a - min(a))/(max(a)-min(a))
-    print(norm1)
     return norm1
